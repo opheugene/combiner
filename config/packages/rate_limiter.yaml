@@ -1,0 +1,6 @@
+framework:
+    rate_limiter:
+        crm_api:
+            policy: 'fixed_window'
+            limit: 10
+            interval: '1 second'

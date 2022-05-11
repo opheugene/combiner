@@ -1,0 +1,11 @@
+services:
+    handler_stack_simla.guzzle:
+        class: 'GuzzleHttp\HandlerStack'
+        factory: ['@App\Guzzle\HandlerStackBuilder\HandlerStackBuilder', 'build']
+        arguments:
+            - !tagged_iterator 'guzzle.middleware.simla'
+
+    http_client_simla.guzzle:
+        class: 'GuzzleHttp\Client'
+        arguments:
+            - handler: '@handler_stack_simla.guzzle'
