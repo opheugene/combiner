@@ -57,6 +57,93 @@ class CheckCommand extends Command
         ;
     }
 
+    // sort clients by priority
+    function sort($list)
+    {
+        uasort($list, function($one, $two) {
+
+            // externalId
+            if (empty($one->externalId) != empty($two->externalId)) {
+                return empty($one->externalId) <=> empty($two->externalId);
+            }
+
+            // ordersCount
+            if ($one->ordersCount != $two->ordersCount) {
+                return $two->ordersCount <=> $one->ordersCount;
+            }
+
+            // phone with international code
+            $oneIntPhone = array_reduce($one->phones, function ($carry, $phone) {
+                $ph = $this->clearPhone($phone, false);
+                return $ph && mb_strlen($ph) == 12 ? $ph : $carry;
+            });
+            $twoIntPhone = array_reduce($two->phones, function ($carry, $phone) {
+                $ph = $this->clearPhone($phone, false);
+                return $ph && mb_strlen($ph) == 12 ? $ph : $carry;
+            });
+            if ($oneIntPhone != $twoIntPhone) {
+                return $twoIntPhone <=> $oneIntPhone;
+            }
+
+            // email
+            if (empty($one->email) != empty($two->email)) {
+                return empty($one->email) <=> empty($two->email);
+            }
+
+            // createdAt
+            if (empty($one->createdAt) != empty($two->createdAt)) {
+                return empty($one->createdAt) <=> empty($two->createdAt);
+            }
+            if (!empty($one->createdAt) && !empty($one->createdAt->date) && !empty($one->createdAt->timezone)
+                && !empty($two->createdAt) && !empty($two->createdAt->date) && !empty($two->createdAt->timezone)
+            ) {
+                $oneCreatedAt = new \DateTimeImmutable($one->createdAt->date, new \DateTimeZone($one->createdAt->timezone));
+                $twoCreatedAt = new \DateTimeImmutable($two->createdAt->date, new \DateTimeZone($two->createdAt->timezone));
+                if ($oneCreatedAt->getTimestamp() != $twoCreatedAt->getTimestamp()) {
+                    return $oneCreatedAt->getTimestamp() <=> $twoCreatedAt->getTimestamp();
+                }
+            }
+
+            // source priority
+            //if ($this->sourcePriority($one) <=> $this->sourcePriority($two)) {
+            //    return $this->sourcePriority($two) <=> $this->sourcePriority($one);
+            //}
+
+            return 0;
+        });
+
+        return $list;
+    }
+
+    function sourcePriority($customer)
+    {
+        if (empty($customer->source->source)) {
+            return 0;
+        }
+        if ($customer->source->source == 'one') {
+            return 10;
+        } elseif ($customer->source->source == 'WordPress') {
+            return 9;
+        } elseif ($customer->source->source == 'Excel') {
+            return 8;
+        } elseif ($customer->source->source == 'excel') {
+            return 7;
+        } elseif ($customer->source->source == 'Instagram') {
+            return 6;
+        } elseif ($customer->source->source == 'fb') {
+            return 5;
+        }
+    }
+
+    // need to exclude the customer from combining duplicates?
+    function isExclude($customer)
+    {
+        // externalId
+        //return !empty($customer->externalId);
+
+        return false;
+    }
+
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $this->io = new SymfonyStyle($input, $output);
@@ -163,76 +250,6 @@ class CheckCommand extends Command
         return Command::SUCCESS;
     }
 
-    // sort clients by priority
-    function sort($list)
-    {
-        uasort($list, function($one, $two) {
-
-            // externalId
-            if (empty($two->externalId) && !empty($one->externalId)) {
-                return -1;
-            }
-            if (empty($one->externalId) && !empty($two->externalId)) {
-                return 1;
-            }
-
-            // ordersCount
-            if ($two->ordersCount != $one->ordersCount) {
-                return $two->ordersCount <=> $one->ordersCount;
-            }
-
-            // createdAt
-            if (empty($two->createdAt) || empty($two->createdAt->date) || empty($two->createdAt->timezone)) {
-                return -1;
-            }
-            if (empty($one->createdAt) || empty($one->createdAt->date) || empty($one->createdAt->timezone)) {
-                return 1;
-            }
-            $oneCreatedAt = new \DateTimeImmutable($one->createdAt->date, new \DateTimeZone($one->createdAt->timezone));
-            $twoCreatedAt = new \DateTimeImmutable($two->createdAt->date, new \DateTimeZone($two->createdAt->timezone));
-
-            if ($oneCreatedAt->getTimestamp() != $twoCreatedAt->getTimestamp()) {
-                return $oneCreatedAt->getTimestamp() <=> $twoCreatedAt->getTimestamp();
-            }
-
-            // source priority
-            //return $this->sourcePriority($two) <=> $this->sourcePriority($one);
-
-            return 0;
-        });
-
-        return $list;
-    }
-
-    function sourcePriority($customer)
-    {
-        if (empty($customer->source->source)) {
-            return 0;
-        }
-        if ($customer->source->source == 'one') {
-            return 10;
-        } elseif ($customer->source->source == 'WordPress') {
-            return 9;
-        } elseif ($customer->source->source == 'Excel') {
-            return 8;
-        } elseif ($customer->source->source == 'excel') {
-            return 7;
-        } elseif ($customer->source->source == 'Instagram') {
-            return 6;
-        } elseif ($customer->source->source == 'fb') {
-            return 5;
-        }
-    }
-
-    // need to exclude the customer from combining duplicates?
-    function isExclude($customer)
-    {
-        // externalId
-        //return !empty($customer->externalId);
-
-        return false;
-    }
-
     function combine($resultCustomerId, $combineCustomersIds)
     {
         try {
@@ -280,13 +297,15 @@ class CheckCommand extends Command
         return $array;
     }
 
-    function clearPhone($phone)
+    function clearPhone($phone, $substr = 10)
     {
         $ph = null;
         if ($phone && !empty($phone->number)) {
             $ph = $phone->number;
             $ph = preg_replace('/[^0-9]/', '', $ph);
-            $ph = substr($ph, -10);
+            if ($substr) {
+                $ph = substr($ph, -$substr);
+            }
         }
 
         return $ph;

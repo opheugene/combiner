@@ -34,5 +34,10 @@ To execute combining duplicates add `--combine`:
 bin/console duplicates:by email id externalId createdAt.date firstName lastName source.source ordersCount --combine
 ```
 
+To periodically execute the command on CRON:
+```
+bin/console duplicates:by phone --no-cache --combine
+```
+
 You can combine options when calling the command, as well as adding option `--silent` to disable message output.
 
