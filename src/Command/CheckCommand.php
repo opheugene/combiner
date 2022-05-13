@@ -31,6 +31,12 @@ class CheckCommand extends Command
     /** @var SymfonyStyle $io */
     private $io;
 
+    /** @var InputInterface $input */
+    private $input;
+
+    /** @var array $criteria */
+    private $criteria;
+
     /** @var array $fields */
     private $fields;
 
@@ -49,11 +55,14 @@ class CheckCommand extends Command
     {
         $this
             ->addArgument('by', InputArgument::REQUIRED, 'By which field to search for duplicates')
-            ->addArgument('fields', InputArgument::IS_ARRAY, 'Fields to show in report')
+            ->addArgument('criteria', InputArgument::IS_ARRAY, 'Customer comparison criteria')
+            ->addOption('fields', null, InputOption::VALUE_REQUIRED, 'Fields to show in report, comma separated')
             ->addOption('no-cache', null, InputOption::VALUE_NONE, 'Get data without cache')
             ->addOption('csv', null, InputOption::VALUE_NONE, 'Save report to CSV file')
             ->addOption('combine', null, InputOption::VALUE_NONE, 'Do combine duplicates of clients')
-            ->addOption('silent', null, InputOption::VALUE_NONE, 'Do not output debug information')
+
+            ->addOption('phoneExactLength', null, InputOption::VALUE_REQUIRED, 'Number of digits for phoneExactLength criteria')
+            ->addOption('sourcePriority', null, InputOption::VALUE_REQUIRED, 'Priority of sources for sourcePriority criteria')
         ;
     }
 
@@ -62,52 +71,70 @@ class CheckCommand extends Command
     {
         uasort($list, function($one, $two) {
 
-            // externalId
-            if (empty($one->externalId) != empty($two->externalId)) {
-                return empty($one->externalId) <=> empty($two->externalId);
-            }
+            foreach ($this->criteria as $criteria) {
+                switch ($criteria) {
 
-            // ordersCount
-            if ($one->ordersCount != $two->ordersCount) {
-                return $two->ordersCount <=> $one->ordersCount;
-            }
+                    case 'externalId':
+                        if (empty($one->externalId) != empty($two->externalId)) {
+                            return empty($one->externalId) <=> empty($two->externalId);
+                        }
+                        break;
 
-            // phone with international code
-            $oneIntPhone = array_reduce($one->phones, function ($carry, $phone) {
-                $ph = $this->clearPhone($phone, false);
-                return $ph && mb_strlen($ph) == 12 ? $ph : $carry;
-            });
-            $twoIntPhone = array_reduce($two->phones, function ($carry, $phone) {
-                $ph = $this->clearPhone($phone, false);
-                return $ph && mb_strlen($ph) == 12 ? $ph : $carry;
-            });
-            if ($oneIntPhone != $twoIntPhone) {
-                return $twoIntPhone <=> $oneIntPhone;
-            }
+                    case 'ordersCount':
+                        if ($one->ordersCount != $two->ordersCount) {
+                            return $two->ordersCount <=> $one->ordersCount;
+                        }
+                        break;
 
-            // email
-            if (empty($one->email) != empty($two->email)) {
-                return empty($one->email) <=> empty($two->email);
-            }
+                    case 'email':
+                        if (empty($one->email) != empty($two->email)) {
+                            return empty($one->email) <=> empty($two->email);
+                        }
+                        break;
 
-            // createdAt
-            if (empty($one->createdAt) != empty($two->createdAt)) {
-                return empty($one->createdAt) <=> empty($two->createdAt);
-            }
-            if (!empty($one->createdAt) && !empty($one->createdAt->date) && !empty($one->createdAt->timezone)
-                && !empty($two->createdAt) && !empty($two->createdAt->date) && !empty($two->createdAt->timezone)
-            ) {
-                $oneCreatedAt = new \DateTimeImmutable($one->createdAt->date, new \DateTimeZone($one->createdAt->timezone));
-                $twoCreatedAt = new \DateTimeImmutable($two->createdAt->date, new \DateTimeZone($two->createdAt->timezone));
-                if ($oneCreatedAt->getTimestamp() != $twoCreatedAt->getTimestamp()) {
-                    return $oneCreatedAt->getTimestamp() <=> $twoCreatedAt->getTimestamp();
+                    case 'phone':
+                        if (empty($one->phones) != empty($two->phones)) {
+                            return empty($one->phones) <=> empty($two->phones);
+                        }
+                        break;
+
+                    case 'phoneExactLength':
+                        $phoneLength = $this->input->getOption('phoneExactLength') ?: 12;
+                        $oneIntPhone = array_reduce($one->phones, function ($carry, $phone) use ($phoneLength) {
+                            $ph = $this->clearPhone($phone, false);
+                            return $ph && mb_strlen($ph) >= $phoneLength ? $ph : $carry;
+                        });
+                        $twoIntPhone = array_reduce($two->phones, function ($carry, $phone) use ($phoneLength) {
+                            $ph = $this->clearPhone($phone, false);
+                            return $ph && mb_strlen($ph) >= $phoneLength ? $ph : $carry;
+                        });
+                        if ($oneIntPhone != $twoIntPhone) {
+                            return $twoIntPhone <=> $oneIntPhone;
+                        }
+                        break;
+
+                    case 'sourcePriority':
+                        if ($this->sourcePriority($one) <=> $this->sourcePriority($two)) {
+                            return $this->sourcePriority($two) <=> $this->sourcePriority($one);
+                        }
+                        break;
+
+                    case 'createdAt':
+                        if (empty($one->createdAt) != empty($two->createdAt)) {
+                            return empty($two->createdAt) <=> empty($one->createdAt);
+                        }
+                        if (!empty($one->createdAt) && !empty($one->createdAt->date) && !empty($one->createdAt->timezone)
+                            && !empty($two->createdAt) && !empty($two->createdAt->date) && !empty($two->createdAt->timezone)
+                        ) {
+                            $oneCreatedAt = new \DateTimeImmutable($one->createdAt->date, new \DateTimeZone($one->createdAt->timezone));
+                            $twoCreatedAt = new \DateTimeImmutable($two->createdAt->date, new \DateTimeZone($two->createdAt->timezone));
+                            if ($oneCreatedAt->getTimestamp() != $twoCreatedAt->getTimestamp()) {
+                                return $oneCreatedAt->getTimestamp() <=> $twoCreatedAt->getTimestamp();
+                            }
+                        }
+                        break;
                 }
             }
-
-            // source priority
-            //if ($this->sourcePriority($one) <=> $this->sourcePriority($two)) {
-            //    return $this->sourcePriority($two) <=> $this->sourcePriority($one);
-            //}
 
             return 0;
         });
@@ -117,22 +144,21 @@ class CheckCommand extends Command
 
     function sourcePriority($customer)
     {
-        if (empty($customer->source->source)) {
+        if (empty($customer) || empty($customer->source) || empty($customer->source->source)) {
             return 0;
         }
-        if ($customer->source->source == 'one') {
-            return 10;
-        } elseif ($customer->source->source == 'WordPress') {
-            return 9;
-        } elseif ($customer->source->source == 'Excel') {
-            return 8;
-        } elseif ($customer->source->source == 'excel') {
-            return 7;
-        } elseif ($customer->source->source == 'Instagram') {
-            return 6;
-        } elseif ($customer->source->source == 'fb') {
-            return 5;
+        $sourcePriority = [];
+        $sources = explode(',', $this->input->getOption('sourcePriority')) ?? [];
+        foreach ($sources as $value) {
+            list ($source, $priority) = array_pad(explode('=', $value), 2, null);
+            if ($source && $priority) {
+                $sourcePriority[$source] = $priority;
+            }
         }
+        if (array_key_exists($customer->source->source, $sourcePriority)) {
+            return $sourcePriority[$customer->source->source];
+        }
+        return 1;
     }
 
     // need to exclude the customer from combining duplicates?
@@ -146,13 +172,19 @@ class CheckCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $this->input = $input;
         $this->io = new SymfonyStyle($input, $output);
-        $by = $input->getArgument('by');
-        $this->fields = $input->getArgument('fields');
-        //$io->note(sprintf('You passed an argument: %s', $by));
+        $by = $this->input->getArgument('by');
+
+        $this->criteria = $this->input->getArgument('criteria');
+        $this->fields = explode(',', $this->input->getOption('fields'));
+
+        if (empty($this->criteria)) {
+            $this->io->note('You have not set any criteria for comparing customers');
+        }
 
         // get customers by sites
-        $noCache = $input->getOption('no-cache');
+        $noCache = $this->input->getOption('no-cache');
         $customersBySites = $this->api->getCachedCustomersBySites($noCache);
 
         // prepare lists of duplicates
@@ -164,7 +196,9 @@ class CheckCommand extends Command
                     $duplicates[$site][$customer->email][$id] = $customer;
                 } elseif ('phone' === $by) {
                     foreach ($customer->phones as $phone) {
-                        $duplicates[$site][$this->clearPhone($phone)][$id] = $customer;
+                        if ($clearedPhone = $this->clearPhone($phone)) {
+                            $duplicates[$site][$clearedPhone][$id] = $customer;
+                        }
                     }
                 }
             }
@@ -177,7 +211,6 @@ class CheckCommand extends Command
                     unset($customers[$field]);
                     continue;
                 }
-                //dump($list);
                 $customers[$field] = $this->sort($list);
             }
             if (!count($customers)) {
@@ -187,7 +220,7 @@ class CheckCommand extends Command
         unset($customers);
 
         // analyse
-        if (!$input->getOption('silent') && $this->fields) {
+        if ($this->fields) {
             foreach ($duplicates as $site => $customers) {
                 $this->table = $this->io->createTable();
                 $this->table->setStyle('default');
@@ -204,7 +237,7 @@ class CheckCommand extends Command
         }
 
         // save report
-        if ($input->getOption('csv')) {
+        if ($this->input->getOption('csv') && $this->fields) {
             $csvPath = $this->params->get('kernel.project_dir') . $this->params->get('report_path');
             foreach ($duplicates as $site => $customers) {
                 $csvFullPath = $csvPath . '/report_by_' . $by . '_' . $site . '.csv';
@@ -216,14 +249,16 @@ class CheckCommand extends Command
                         fputcsv($csv, $this->toArray($customer));
                     }
                 }
-                if (!$input->getOption('silent')) {
-                    $this->io->success('CSV file saved to ' . $csvFullPath);
-                }
+                $this->io->success('CSV file saved to ' . $csvFullPath);
             }
         }
 
         // combine
-        if ($input->getOption('combine')) {
+        if ($this->input->getOption('combine')) {
+            if (empty($this->criteria)) {
+                $this->io->error('Specify comparison criteria');
+                return Command::INVALID;
+            }
             $combined = 0;
             foreach ($duplicates as $customers) {
                 foreach ($customers as $list) {
@@ -242,7 +277,7 @@ class CheckCommand extends Command
                     }
                 }
             }
-            if (!$input->getOption('silent') && $combined) {
+            if ($combined) {
                 $this->io->success('Combined customers: ' . $combined);
             }
         }
