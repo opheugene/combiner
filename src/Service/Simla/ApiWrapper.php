@@ -2,18 +2,14 @@
 
 namespace App\Service\Simla;
 
-use GuzzleHttp\ClientInterface;
 use Psr\Log\LoggerInterface;
 use RetailCrm\Api\Client;
 use RetailCrm\Api\Enum\ByIdentifier;
-use RetailCrm\Api\Factory\ClientFactory;
 use RetailCrm\Api\Interfaces\ApiExceptionInterface;
 use RetailCrm\Api\Model\Entity\Customers\SerializedCustomerReference;
-use RetailCrm\Api\Model\Request\BySiteRequest;
 use RetailCrm\Api\Model\Request\Customers\CustomersCombineRequest;
 use RetailCrm\Api\Model\Request\Customers\CustomersEditRequest;
 use RetailCrm\Api\Model\Request\Customers\CustomersRequest;
-use Symfony\Component\DependencyInjection\ParameterBag\ContainerBagInterface;
 
 class ApiWrapper implements ApiWrapperInterface
 {
@@ -27,19 +23,13 @@ class ApiWrapper implements ApiWrapperInterface
     private $logger;
 
     public function __construct(
-        ClientInterface $httpClient,
-        ContainerBagInterface $params,
+        Client $client,
+        string $cachedDataPath,
         LoggerInterface $logger
     ) {
-        $this->cachedDataPath = $params->get('kernel.project_dir') . $params->get('cached_data_path');
+        $this->client = $client;
+        $this->cachedDataPath = $cachedDataPath;
         $this->logger = $logger;
-
-        $apiUrl = $params->get('crm.api_url');
-        $apiKey = $params->get('crm.api_key');
-
-        $factory = new ClientFactory();
-        $factory->setHttpClient($httpClient);
-        $this->client = $factory->createClient($apiUrl, $apiKey);
     }
 
     public function check()

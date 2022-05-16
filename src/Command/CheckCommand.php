@@ -3,8 +3,7 @@
 namespace App\Command;
 
 use App\Service\Simla\ApiWrapper;
-use RetailCrm\Api\Interfaces\ApiExceptionInterface;
-use RetailCrm\Api\Interfaces\ClientExceptionInterface;
+use App\Service\Simla\ApiWrapperFactory;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\TableSeparator;
 use Symfony\Component\Console\Input\InputArgument;
@@ -25,6 +24,9 @@ class CheckCommand extends Command
     /** @var ParameterBagInterface $params */
     private $params;
 
+    /** @var ApiWrapperFactory $factory */
+    private $factory;
+
     /** @var ApiWrapper $api */
     private $api;
 
@@ -43,10 +45,10 @@ class CheckCommand extends Command
     /** @var Table $table */
     private $table;
 
-    public function __construct(ParameterBagInterface $params, ApiWrapper $api)
+    public function __construct(ParameterBagInterface $params, ApiWrapperFactory $factory)
     {
         $this->params = $params;
-        $this->api = $api;
+        $this->factory = $factory;
 
         parent::__construct();
     }
@@ -63,11 +65,14 @@ class CheckCommand extends Command
 
             ->addOption('phoneExactLength', null, InputOption::VALUE_REQUIRED, 'Number of digits for phoneExactLength criteria')
             ->addOption('sourcePriority', null, InputOption::VALUE_REQUIRED, 'Priority of sources for sourcePriority criteria')
+
+            ->addOption('crmUrl', null, InputOption::VALUE_REQUIRED, 'Simla.com URL')
+            ->addOption('apiKey', null, InputOption::VALUE_REQUIRED, 'Simla.com API Key')
         ;
     }
 
     // sort clients by priority
-    function sort($list)
+    protected function sort($list)
     {
         uasort($list, function($one, $two) {
 
@@ -142,7 +147,7 @@ class CheckCommand extends Command
         return $list;
     }
 
-    function sourcePriority($customer)
+    protected function sourcePriority($customer)
     {
         if (empty($customer) || empty($customer->source) || empty($customer->source->source)) {
             return 0;
@@ -162,7 +167,7 @@ class CheckCommand extends Command
     }
 
     // need to exclude the customer from combining duplicates?
-    function isExclude($customer)
+    protected function isExclude($customer)
     {
         // externalId
         //return !empty($customer->externalId);
@@ -174,11 +179,14 @@ class CheckCommand extends Command
     {
         $this->input = $input;
         $this->io = new SymfonyStyle($input, $output);
+
         $by = $this->input->getArgument('by');
+        if (!$this->initApi()) {
+            return Command::FAILURE;
+        }
 
         $this->criteria = $this->input->getArgument('criteria');
         $this->fields = explode(',', $this->input->getOption('fields'));
-
         if (empty($this->criteria)) {
             $this->io->note('You have not set any criteria for comparing customers');
         }
@@ -238,9 +246,14 @@ class CheckCommand extends Command
 
         // save report
         if ($this->input->getOption('csv') && $this->fields) {
-            $csvPath = $this->params->get('kernel.project_dir') . $this->params->get('report_path');
             foreach ($duplicates as $site => $customers) {
-                $csvFullPath = $csvPath . '/report_by_' . $by . '_' . $site . '.csv';
+                $csvFullPath = sprintf(
+                    '%s/%s_by_%s_%s.csv',
+                    $this->params->get('kernel.project_dir') . $this->params->get('report_path'),
+                    $this->getCrmName($this->input->getOption('crmUrl') ?? 'crm'),
+                    $by,
+                    $site
+                );
                 $csv = fopen($csvFullPath, 'w');
                 fputcsv($csv, $this->fields);
                 foreach ($customers as $field => $list) {
@@ -285,7 +298,26 @@ class CheckCommand extends Command
         return Command::SUCCESS;
     }
 
-    function combine($resultCustomerId, $combineCustomersIds)
+    protected function initApi()
+    {
+        $crmUrl = $this->input->getOption('crmUrl');
+        $apiKey = $this->input->getOption('apiKey');
+        if (empty($crmUrl) || empty($apiKey)) {
+            $this->io->error('You have to specify CRM API credentials');
+            return false;
+        }
+
+        try {
+            $this->api = $this->factory->create($crmUrl, $apiKey);
+            return true;
+        } catch (\Throwable $e) {
+            $this->io->error($e->getMessage());
+        }
+
+        return false;
+    }
+
+    protected function combine($resultCustomerId, $combineCustomersIds)
     {
         try {
             if ($resultCustomerId && count($combineCustomersIds)) {
@@ -297,19 +329,19 @@ class CheckCommand extends Command
         }
     }
 
-    function addLineToTable($line)
+    protected function addLineToTable($line)
     {
         $this->table->addRow(array_pad([$line], count($this->fields), null));
     }
 
-    function addRowsToTable($customers)
+    protected function addRowsToTable($customers)
     {
         foreach ($customers as $customer) {
             $this->table->addRow($this->toArray($customer));
         }
     }
 
-    function toArray($customer)
+    protected function toArray($customer)
     {
         $array = [];
         foreach ($this->fields as $path) {
@@ -332,7 +364,7 @@ class CheckCommand extends Command
         return $array;
     }
 
-    function clearPhone($phone, $substr = 10)
+    protected function clearPhone($phone, $substr = 10)
     {
         $ph = null;
         if ($phone && !empty($phone->number)) {
@@ -344,5 +376,10 @@ class CheckCommand extends Command
         }
 
         return $ph;
+    }
+
+    protected function getCrmName($crmUrl)
+    {
+        return str_replace('.', '_', str_replace(['/', 'http:', 'https:'], '', $crmUrl));
     }
 }

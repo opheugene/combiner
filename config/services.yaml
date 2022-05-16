@@ -2,8 +2,6 @@ imports:
     - { resource: resources/ }
 
 parameters:
-    crm.api_url: '%env(string:CRM_API_URL)%'
-    crm.api_key: '%env(string:CRM_API_KEY)%'
     cached_data_path: '%env(string:CACHED_DATA_PATH)%'
     report_path: '%env(string:REPORT_PATH)%'
 
@@ -27,7 +25,7 @@ services:
             - true
             - true
 
-    App\Service\Simla\ApiWrapper:
-        class: 'App\Service\Simla\ApiWrapper'
+    App\Service\Simla\ApiWrapperFactory:
+        class: 'App\Service\Simla\ApiWrapperFactory'
         arguments:
             $httpClient: '@http_client_simla.guzzle'
