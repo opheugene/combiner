@@ -181,12 +181,15 @@ class CheckCommand extends Command
         $this->io = new SymfonyStyle($input, $output);
 
         $by = $this->input->getArgument('by');
+
         if (!$this->initApi()) {
             return Command::FAILURE;
         }
 
+        $fields = $this->input->getOption('fields');
+        $this->fields = $fields ? explode(',', $fields) : [];
         $this->criteria = $this->input->getArgument('criteria');
-        $this->fields = explode(',', $this->input->getOption('fields'));
+
         if (empty($this->criteria)) {
             $this->io->note('You have not set any criteria for comparing customers');
         }
@@ -344,6 +347,7 @@ class CheckCommand extends Command
     protected function toArray($customer)
     {
         $array = [];
+
         foreach ($this->fields as $path) {
             $array[] = array_reduce(
                 explode('.', $path),
@@ -361,6 +365,7 @@ class CheckCommand extends Command
                 $customer
             );
         }
+
         return $array;
     }
 
