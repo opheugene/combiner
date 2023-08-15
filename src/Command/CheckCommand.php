@@ -63,7 +63,7 @@ class CheckCommand extends Command
             ->addOption('all-sites', null, InputOption::VALUE_NONE, 'Look for duplicates in all sites')
             ->addOption('csv', null, InputOption::VALUE_NONE, 'Save report to CSV file')
             ->addOption('combine', null, InputOption::VALUE_NONE, 'Do combine duplicates of clients')
-            ->addOption('mergeManagers', null, InputOption::VALUE_NONE, 'Merge duplicates managers to client')
+            ->addOption('merge-managers', null, InputOption::VALUE_NONE, 'Merge duplicates managers to client')
 
             ->addOption('phoneExactLength', null, InputOption::VALUE_REQUIRED, 'Number of digits for phoneExactLength criteria')
             ->addOption('sourcePriority', null, InputOption::VALUE_REQUIRED, 'Priority of sources for sourcePriority criteria')
@@ -232,7 +232,7 @@ class CheckCommand extends Command
         unset($customers);
 
         // merge managers
-        if ($this->input->getOption('mergeManagers')) {
+        if ($this->input->getOption('merge-managers')) {
             $manager = null;
             $haveManager = false;
             foreach ($duplicates as $site => &$customers) {
@@ -240,13 +240,11 @@ class CheckCommand extends Command
                     foreach ($list as $item) {
                         if (!is_null($item->managerId)) {
                             $manager = $item->managerId;
-                            $haveManager = true;
+                            break;
                         }
                     }
-                    if ($haveManager) {
-                        foreach ($list as $item) {
-                            $item->managerId = $manager;
-                        }
+                    if (!is_null($manager)) {
+                        reset($list)->managerId = $manager;
                     }
                 }
             }
