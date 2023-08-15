@@ -36,6 +36,6 @@ class ApiWrapperFactory
 
         $cachedDataPath = $this->params->get('kernel.project_dir') . $this->params->get('cached_data_path');
 
-        return new ApiWrapper($client, $cachedDataPath, $this->logger);
+        return new ApiWrapper($client, $cachedDataPath, $this->logger, $apiUrl);
     }
 }

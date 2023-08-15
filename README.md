@@ -14,6 +14,7 @@ bin/console duplicates:by email|phone criteria1 criteria2 criteria3 ...  --field
 * **phoneExactLength**: the length of one of the client's phones is greater than or equal to a certain number of digits (use `--phoneExactLength` option to specify a number of digits)
 * **sourcePriority**: client source priority (use `--sourcePriority` option to specify priority of sources: `--sourcePriority=Excel=10,PrestaShop=8,Messanger=4`)
 * **createdAt**: an older client is more important
+* **moreData**: client with more fulfilled card is more important ('firstName', 'lastName', 'email', 'phones', 'birthday', 'address')
 
 **Connection settings:**
 

@@ -22,14 +22,19 @@ class ApiWrapper implements ApiWrapperInterface
     /** @var LoggerInterface $logger */
     private $logger;
 
+    /** @var string $apiUrl */
+    private $apiUrl;
+
     public function __construct(
         Client $client,
         string $cachedDataPath,
-        LoggerInterface $logger
+        LoggerInterface $logger,
+        string $apiUrl
     ) {
         $this->client = $client;
         $this->cachedDataPath = $cachedDataPath;
         $this->logger = $logger;
+        $this->apiUrl = $apiUrl;
     }
 
     public function check()
@@ -52,7 +57,7 @@ class ApiWrapper implements ApiWrapperInterface
 
     public function getCachedCustomersBySites(bool $noCache = false)
     {
-        $customersFile = $this->cachedDataPath . '/customers.json';
+        $customersFile = $this->cachedDataPath . '/' . str_replace(['/', ':', 'https'], '', $this->apiUrl) . '_customers.json';
         if (false === $noCache && file_exists($customersFile)) {
             $customers = json_decode(file_get_contents($customersFile));
 

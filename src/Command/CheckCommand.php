@@ -17,6 +17,13 @@ use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 class CheckCommand extends Command
 {
     const EMAIL_REGEXP = "/^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,})$/i";
+    const COUNT_FIELDS = [
+        'firstName',
+        'lastName',
+        'email',
+        'phones',
+        'birthday',
+    ];
 
     protected static $defaultName = 'duplicates:by';
     protected static $defaultDescription = 'Show and combine duplicates in CRM by email or phone';
@@ -59,6 +66,7 @@ class CheckCommand extends Command
             ->addArgument('by', InputArgument::REQUIRED, 'By which field to search for duplicates')
             ->addArgument('criteria', InputArgument::IS_ARRAY, 'Customer comparison criteria')
             ->addOption('fields', null, InputOption::VALUE_REQUIRED, 'Fields to show in report, comma separated')
+            ->addOption('all-sites', null, InputOption::VALUE_NONE, 'Look for duplicates in all sites')
             ->addOption('no-cache', null, InputOption::VALUE_NONE, 'Get data without cache')
             ->addOption('csv', null, InputOption::VALUE_NONE, 'Save report to CSV file')
             ->addOption('combine', null, InputOption::VALUE_NONE, 'Do combine duplicates of clients')
@@ -138,6 +146,12 @@ class CheckCommand extends Command
                             }
                         }
                         break;
+
+                    case 'moreData':
+                        if ($this->countFilledFields($one) != $this->countFilledFields($two)) {
+                            return $this->countFilledFields($two) <=> $this->countFilledFields($one);
+                        }
+                        break;
                 }
             }
 
@@ -145,6 +159,25 @@ class CheckCommand extends Command
         });
 
         return $list;
+    }
+
+    protected function countFilledFields($customer)
+    {
+        $counter = 0;
+
+        foreach (self::COUNT_FIELDS as $field) {
+            if (!empty($customer->$field)) {
+                $counter++;
+            }
+        }
+
+        foreach ((array) $customer->address as $field) {
+            if (!empty($field)) {
+                $counter++;
+            }
+        }
+
+        return $counter;
     }
 
     protected function sourcePriority($customer)
@@ -196,13 +229,14 @@ class CheckCommand extends Command
 
         // get customers by sites
         $noCache = $this->input->getOption('no-cache');
+        $allSites = $this->input->getOption('all-sites');
         $customersBySites = $this->api->getCachedCustomersBySites($noCache);
 
         // prepare lists of duplicates
         $duplicates = [];
         foreach ($customersBySites as $site => $customers) {
+            $site = $allSites ? 'all_sites' : $site;
             foreach ($customers as $id => $customer) {
-
                 if ('email' === $by && $customer->email && preg_match(self::EMAIL_REGEXP, $customer->email)) {
                     $duplicates[$site][$customer->email][$id] = $customer;
                 } elseif ('phone' === $by) {
