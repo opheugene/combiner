@@ -233,9 +233,9 @@ class CheckCommand extends Command
 
         // merge managers
         if ($this->input->getOption('merge-managers')) {
-            $manager = null;
             foreach ($duplicates as $site => &$customers) {
                 foreach ($customers as $field => $list) {
+                    $manager = null;
                     foreach ($list as $item) {
                         if (!is_null($item->managerId)) {
                             $manager = $item->managerId;
