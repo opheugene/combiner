@@ -68,8 +68,10 @@ class CheckCommand extends Command
             ->addOption('fields', null, InputOption::VALUE_REQUIRED, 'Fields to show in report, comma separated')
             ->addOption('all-sites', null, InputOption::VALUE_NONE, 'Look for duplicates in all sites')
             ->addOption('no-cache', null, InputOption::VALUE_NONE, 'Get data without cache')
+            ->addOption('all-sites', null, InputOption::VALUE_NONE, 'Look for duplicates in all sites')
             ->addOption('csv', null, InputOption::VALUE_NONE, 'Save report to CSV file')
             ->addOption('combine', null, InputOption::VALUE_NONE, 'Do combine duplicates of clients')
+            ->addOption('merge-managers', null, InputOption::VALUE_NONE, 'Merge duplicates managers to client')
 
             ->addOption('phoneExactLength', null, InputOption::VALUE_REQUIRED, 'Number of digits for phoneExactLength criteria')
             ->addOption('sourcePriority', null, InputOption::VALUE_REQUIRED, 'Priority of sources for sourcePriority criteria')
@@ -248,7 +250,6 @@ class CheckCommand extends Command
                 }
             }
         }
-
         // sort
         foreach ($duplicates as $site => &$customers) {
             foreach ($customers as $field => $list) {
@@ -263,6 +264,25 @@ class CheckCommand extends Command
             }
         }
         unset($customers);
+
+        // merge managers
+        if ($this->input->getOption('merge-managers')) {
+            foreach ($duplicates as $site => &$customers) {
+                foreach ($customers as $field => $list) {
+                    $manager = null;
+                    foreach ($list as $item) {
+                        if (!is_null($item->managerId)) {
+                            $manager = $item->managerId;
+                            break;
+                        }
+                    }
+                    if (!is_null($manager)) {
+                        reset($list)->managerId = $manager;
+                    }
+                }
+            }
+            unset($customers);
+        }
 
         // analyse
         if ($this->fields) {

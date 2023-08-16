@@ -45,6 +45,10 @@ To execute combining duplicates add `--combine`:
 bin/console duplicates:by email externalId ordersCount email phone createdAt --fields=id,externalId,createdAt.date,firstName,lastName,email,phones,source.source,ordersCount --combine
 ```
 
+To merge managers add `--merge-managers`
+```
+bin/console duplicates:by phone externalId ordersCount email phone createdAt --csv --merge-managers
+```
 To periodically execute the command on CRON:
 ```
 bin/console duplicates:by phone externalId ordersCount email phone createdAt --combine --no-cache
