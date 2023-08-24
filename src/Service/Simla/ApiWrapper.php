@@ -99,17 +99,22 @@ class ApiWrapper implements ApiWrapperInterface
         return $customers;
     }
 
-    public function customerEdit($customer)
+    public function customerEdit($customer, $by = ByIdentifier::EXTERNAL_ID)
     {
         $this->logger->debug('Customer to edit: ' . print_r($customer, true));
 
         $request           = new CustomersEditRequest();
-        $request->by       = ByIdentifier::EXTERNAL_ID;
+        $request->by       = $by;
         $request->customer = $customer;
         $request->site     = $customer->site;
 
         try {
-            $this->client->customers->edit($customer->externalId, $request);
+            if ($by === ByIdentifier::EXTERNAL_ID) {
+                $this->client->customers->edit($customer->externalId, $request);
+            }
+            else {
+                $this->client->customers->edit($customer->id, $request);
+            }
         } catch (ApiExceptionInterface $exception) {
             $this->logger->error(sprintf(
                 'Error from RetailCRM API (status code: %d): %s',

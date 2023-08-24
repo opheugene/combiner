@@ -4,6 +4,7 @@ namespace App\Command;
 
 use App\Service\Simla\ApiWrapper;
 use App\Service\Simla\ApiWrapperFactory;
+use RetailCrm\Api\Enum\ByIdentifier;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\TableSeparator;
 use Symfony\Component\Console\Input\InputArgument;
@@ -265,6 +266,7 @@ class CheckCommand extends Command
         }
         unset($customers);
 
+        $editCustomer = [];
         // merge managers
         if ($this->input->getOption('merge-managers')) {
             foreach ($duplicates as $site => &$customers) {
@@ -278,6 +280,7 @@ class CheckCommand extends Command
                     }
                     if (!is_null($manager)) {
                         reset($list)->managerId = $manager;
+                        $editCustomer[reset($list)->id] = reset($list);
                     }
                 }
             }
@@ -344,6 +347,7 @@ class CheckCommand extends Command
                     }
                     if ($this->combine($resultCustomerId, $combineIds)) {
                         $combined += count($combineIds);
+                        $this->api->customerEdit($editCustomer[$resultCustomerId], ByIdentifier::ID);
                     }
                 }
             }
