@@ -69,7 +69,6 @@ class CheckCommand extends Command
             ->addOption('fields', null, InputOption::VALUE_REQUIRED, 'Fields to show in report, comma separated')
             ->addOption('all-sites', null, InputOption::VALUE_NONE, 'Look for duplicates in all sites')
             ->addOption('no-cache', null, InputOption::VALUE_NONE, 'Get data without cache')
-            ->addOption('all-sites', null, InputOption::VALUE_NONE, 'Look for duplicates in all sites')
             ->addOption('csv', null, InputOption::VALUE_NONE, 'Save report to CSV file')
             ->addOption('combine', null, InputOption::VALUE_NONE, 'Do combine duplicates of clients')
             ->addOption('merge-managers', null, InputOption::VALUE_NONE, 'Merge duplicates managers to client')
