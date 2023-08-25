@@ -105,7 +105,7 @@ class ApiWrapper implements ApiWrapperInterface
 
         $request           = new CustomersEditRequest();
         $request->by       = $by;
-        $request->customer = $customer;
+        $request->customer = $customer->customer;
         $request->site     = $customer->site;
 
         try {
@@ -124,8 +124,12 @@ class ApiWrapper implements ApiWrapperInterface
 
             return null;
         }
-
-        $this->logger->info('Customer edited: externalId#' . $customer->externalId);
+        if ($by === ByIdentifier::EXTERNAL_ID) {
+             $this->logger->info('Customer edited: externalId#' . $customer->externalId);
+        }
+        else {
+            $this->logger->info('Customer edited: id#' . $customer->id);
+        }
     }
 
     /**
