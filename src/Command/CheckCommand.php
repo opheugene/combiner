@@ -277,9 +277,9 @@ class CheckCommand extends Command
                             break;
                         }
                     }
-                    if (!is_null($manager)) {
+                    if (!is_null($manager) && reset($list)->managerId !== $manager) {
                         reset($list)->managerId = $manager;
-                        $editCustomer[reset($list)->id] = reset($list);
+                        $editCustomer[reset($list)->id]['customer'] = ['managerId' => reset($list)->managerId];
                     }
                 }
             }
@@ -346,7 +346,11 @@ class CheckCommand extends Command
                     }
                     if ($this->combine($resultCustomerId, $combineIds)) {
                         $combined += count($combineIds);
-                        $this->api->customerEdit($editCustomer[$resultCustomerId], ByIdentifier::ID);
+                        if (isset($editCustomer[$resultCustomerId])) {
+                            $editCustomer[$resultCustomerId]['id'] = $resultCustomerId;
+                            $editCustomer[$resultCustomerId]['site'] = $list[$resultCustomerId]->site;
+                            $this->api->customerEdit($editCustomer[$resultCustomerId], ByIdentifier::ID);
+                        }
                     }
                 }
             }

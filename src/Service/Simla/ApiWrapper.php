@@ -105,15 +105,15 @@ class ApiWrapper implements ApiWrapperInterface
 
         $request           = new CustomersEditRequest();
         $request->by       = $by;
-        $request->customer = $customer;
-        $request->site     = $customer->site;
+        $request->customer = $customer['customer'];
+        $request->site     = $customer['site'];
 
         try {
             if ($by === ByIdentifier::EXTERNAL_ID) {
                 $this->client->customers->edit($customer->externalId, $request);
             }
             else {
-                $this->client->customers->edit($customer->id, $request);
+                $this->client->customers->edit($customer['id'], $request);
             }
         } catch (ApiExceptionInterface $exception) {
             $this->logger->error(sprintf(
@@ -124,8 +124,12 @@ class ApiWrapper implements ApiWrapperInterface
 
             return null;
         }
-
-        $this->logger->info('Customer edited: externalId#' . $customer->externalId);
+        if ($by === ByIdentifier::EXTERNAL_ID) {
+             $this->logger->info('Customer edited: externalId#' . $customer->externalId);
+        }
+        else {
+            $this->logger->info('Customer edited: id#' . $customer['id']);
+        }
     }
 
     /**
