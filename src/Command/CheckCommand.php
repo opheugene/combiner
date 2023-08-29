@@ -4,6 +4,8 @@ namespace App\Command;
 
 use App\Service\Simla\ApiWrapper;
 use App\Service\Simla\ApiWrapperFactory;
+use RetailCrm\Api\Enum\ByIdentifier;
+use RetailCrm\Api\Model\Entity\Customers\Customer;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\TableSeparator;
 use Symfony\Component\Console\Input\InputArgument;
@@ -68,7 +70,6 @@ class CheckCommand extends Command
             ->addOption('fields', null, InputOption::VALUE_REQUIRED, 'Fields to show in report, comma separated')
             ->addOption('all-sites', null, InputOption::VALUE_NONE, 'Look for duplicates in all sites')
             ->addOption('no-cache', null, InputOption::VALUE_NONE, 'Get data without cache')
-            ->addOption('all-sites', null, InputOption::VALUE_NONE, 'Look for duplicates in all sites')
             ->addOption('csv', null, InputOption::VALUE_NONE, 'Save report to CSV file')
             ->addOption('combine', null, InputOption::VALUE_NONE, 'Do combine duplicates of clients')
             ->addOption('merge-managers', null, InputOption::VALUE_NONE, 'Merge duplicates managers to client')
@@ -265,6 +266,7 @@ class CheckCommand extends Command
         }
         unset($customers);
 
+        $editCustomer = [];
         // merge managers
         if ($this->input->getOption('merge-managers')) {
             foreach ($duplicates as $site => &$customers) {
@@ -276,8 +278,14 @@ class CheckCommand extends Command
                             break;
                         }
                     }
-                    if (!is_null($manager)) {
+
+                    if (!is_null($manager) && reset($list)->managerId !== $manager) {
                         reset($list)->managerId = $manager;
+                        $customer = new Customer();
+                        $customer->id = reset($list)->id;
+                        $customer->site = reset($list)->site;
+                        $customer->managerId = reset($list)->managerId;
+                        $editCustomer[reset($list)->id] = $customer;
                     }
                 }
             }
@@ -342,8 +350,13 @@ class CheckCommand extends Command
                         }
                         $combineIds[] = $id;
                     }
+
                     if ($this->combine($resultCustomerId, $combineIds)) {
                         $combined += count($combineIds);
+
+                        if (isset($editCustomer[$resultCustomerId])) {
+                            $this->api->customerEdit($editCustomer[$resultCustomerId], ByIdentifier::ID);
+                        }
                     }
                 }
             }
