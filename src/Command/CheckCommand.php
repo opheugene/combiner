@@ -5,6 +5,7 @@ namespace App\Command;
 use App\Service\Simla\ApiWrapper;
 use App\Service\Simla\ApiWrapperFactory;
 use RetailCrm\Api\Enum\ByIdentifier;
+use RetailCrm\Api\Model\Entity\Customers\Customer;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\TableSeparator;
 use Symfony\Component\Console\Input\InputArgument;
@@ -277,15 +278,14 @@ class CheckCommand extends Command
                             break;
                         }
                     }
+
                     if (!is_null($manager) && reset($list)->managerId !== $manager) {
                         reset($list)->managerId = $manager;
-                        $editCustomer[reset($list)->id] = (object) [
-                            'id' => reset($list)->id,
-                            'site' => reset($list)->site,
-                            'customer' => [
-                                'managerId' => reset($list)->managerId
-                            ]
-                        ];
+                        $customer = new Customer();
+                        $customer->id = reset($list)->id;
+                        $customer->site = reset($list)->site;
+                        $customer->managerId = reset($list)->managerId;
+                        $editCustomer[reset($list)->id] = $customer;
                     }
                 }
             }
@@ -350,8 +350,10 @@ class CheckCommand extends Command
                         }
                         $combineIds[] = $id;
                     }
+
                     if ($this->combine($resultCustomerId, $combineIds)) {
                         $combined += count($combineIds);
+
                         if (isset($editCustomer[$resultCustomerId])) {
                             $this->api->customerEdit($editCustomer[$resultCustomerId], ByIdentifier::ID);
                         }
