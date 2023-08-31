@@ -73,6 +73,7 @@ class CheckCommand extends Command
             ->addOption('csv', null, InputOption::VALUE_NONE, 'Save report to CSV file')
             ->addOption('combine', null, InputOption::VALUE_NONE, 'Do combine duplicates of clients')
             ->addOption('merge-managers', null, InputOption::VALUE_NONE, 'Merge duplicates managers to client')
+            ->addOption('merge-phones', null, InputOption::VALUE_REQUIRED, 'Merge numbers to number with country code')
 
             ->addOption('phoneExactLength', null, InputOption::VALUE_REQUIRED, 'Number of digits for phoneExactLength criteria')
             ->addOption('sourcePriority', null, InputOption::VALUE_REQUIRED, 'Priority of sources for sourcePriority criteria')
@@ -153,6 +154,13 @@ class CheckCommand extends Command
                     case 'moreData':
                         if ($this->countFilledFields($one) != $this->countFilledFields($two)) {
                             return $this->countFilledFields($two) <=> $this->countFilledFields($one);
+                        }
+                        break;
+
+                    // если у пользователей по 1му номеру
+                    case 'phoneLength':
+                        if (strlen($one->phones[0]->number) > strlen($two->phones[0]->number)) {
+                            return strlen($one->phones[0]->number) <=> strlen($two->phones[0]->number);
                         }
                         break;
                 }
@@ -292,6 +300,38 @@ class CheckCommand extends Command
             unset($customers);
         }
 
+        // merge phones
+        $substr = $this->input->getOption('merge-phones') ?: 10;
+        if ($this->input->getOption('merge-phones')) {
+            $phones = array();
+            foreach ($duplicates as $customers) {
+                foreach ($customers as $list) {
+                    foreach ($list as $item) {
+                        foreach ($item->phones as $phone) {
+                            $phoneIndex = substr($phone->number, -$substr);
+                            if (!isset($phones[$phoneIndex])) {
+                                $phones[$phoneIndex] = $phone;
+                            } elseif (strlen($phones[$phoneIndex]->number) < strlen($phone->number)) {
+                                $phones[$phoneIndex] = $phone;
+                            }
+                        }
+                    }
+
+                    $phones = array_values($phones);
+
+                    if (isset($editCustomer[reset($list)->id])) {
+                        $editCustomer[reset($list)->id]->phones = $phones;
+                    } else {
+                        $customer = new Customer();
+                        $customer->id = reset($list)->id;
+                        $customer->site = reset($list)->site;
+                        $customer->phones = $phones;
+                        $editCustomer[reset($list)->id] = $customer;
+                    }
+                }
+            }
+        }
+
         // analyse
         if ($this->fields) {
             foreach ($duplicates as $site => $customers) {
@@ -355,6 +395,7 @@ class CheckCommand extends Command
                         $combined += count($combineIds);
 
                         if (isset($editCustomer[$resultCustomerId])) {
+                            // sleep(20);
                             $this->api->customerEdit($editCustomer[$resultCustomerId], ByIdentifier::ID);
                         }
                     }
