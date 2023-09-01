@@ -156,14 +156,6 @@ class CheckCommand extends Command
                             return $this->countFilledFields($two) <=> $this->countFilledFields($one);
                         }
                         break;
-
-
-                    // если у пользователей по 1му номеру
-                    case 'phoneLength':
-                        if (strlen($one->phones[0]->number) > strlen($two->phones[0]->number)) {
-                            return strlen($one->phones[0]->number) <=> strlen($two->phones[0]->number);
-                        }
-                        break;
                 }
             }
 
@@ -395,15 +387,22 @@ class CheckCommand extends Command
                     if ($this->combine($resultCustomerId, $combineIds)) {
                         $combined += count($combineIds);
 
-                        if (isset($editCustomer[$resultCustomerId])) {
-                            // sleep(20);
-                            $this->api->customerEdit($editCustomer[$resultCustomerId], ByIdentifier::ID);
-                        }
                     }
                 }
             }
             if ($combined) {
                 $this->io->success('Combined customers: ' . $combined);
+                // wait some time, then edit customers
+                sleep(20);
+                foreach ($duplicates as $customers) {
+                    foreach ($customers as $list) {
+                        reset($list);
+                        $resultCustomerId = key($list);
+                        if (isset($editCustomer[$resultCustomerId])) {
+                            $this->api->customerEdit($editCustomer[$resultCustomerId], ByIdentifier::ID);
+                        }
+                    }
+                }
             }
         }
 
