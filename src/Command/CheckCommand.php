@@ -301,11 +301,13 @@ class CheckCommand extends Command
                     $phones = array();
                     foreach ($list as $item) {
                         foreach ($item->phones as $phone) {
-                            $phone->number = preg_replace('/[^+0-9]/', '', $phone->number);
-                            $phoneIndex = substr($phone->number, -$substr);
+                            $cleanNumber = preg_replace('/[^+0-9]/', '', $phone->number);
+                            $phoneIndex = substr($cleanNumber, -$substr);
                             if (!isset($phones[$phoneIndex])) {
                                 $phones[$phoneIndex] = $phone;
-                            } elseif (strlen($phones[$phoneIndex]->number) < strlen($phone->number)) {
+                            } elseif (strlen(preg_replace('/[^+0-9]/',
+                                    '',
+                                    $phones[$phoneIndex]->number)) < strlen($cleanNumber)) {
                                 $phones[$phoneIndex] = $phone;
                             }
                         }
