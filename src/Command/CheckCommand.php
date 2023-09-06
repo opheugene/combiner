@@ -301,7 +301,7 @@ class CheckCommand extends Command
                     $phones = array();
                     foreach ($list as $item) {
                         foreach ($item->phones as $phone) {
-                            $phone->number = str_replace(' ', '', $phone->number);
+                            $phone->number = preg_replace('/[^+0-9]/', '', $phone->number);
                             $phoneIndex = substr($phone->number, -$substr);
                             if (!isset($phones[$phoneIndex])) {
                                 $phones[$phoneIndex] = $phone;
