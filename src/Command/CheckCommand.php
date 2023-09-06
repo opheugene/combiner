@@ -296,21 +296,24 @@ class CheckCommand extends Command
         // merge phones
         $substr = $this->input->getOption('merge-phones') ?: 10;
         if ($this->input->getOption('merge-phones')) {
-            $phones = array();
-            foreach ($duplicates as $customers) {
+            foreach ($duplicates as &$customers) {
                 foreach ($customers as $list) {
+                    $phones = array();
                     foreach ($list as $item) {
                         foreach ($item->phones as $phone) {
-                            $phoneIndex = substr($phone->number, -$substr);
+                            $cleanNumber = preg_replace('/[^+0-9]/', '', $phone->number);
+                            $phoneIndex = substr($cleanNumber, -$substr);
                             if (!isset($phones[$phoneIndex])) {
                                 $phones[$phoneIndex] = $phone;
-                            } elseif (strlen($phones[$phoneIndex]->number) < strlen($phone->number)) {
+                            } elseif (strlen(preg_replace('/[^+0-9]/',
+                                    '',
+                                    $phones[$phoneIndex]->number)) < strlen($cleanNumber)) {
                                 $phones[$phoneIndex] = $phone;
                             }
                         }
                     }
-
                     $phones = array_values($phones);
+                    reset($list)->phones = $phones;
 
                     if (isset($editCustomer[reset($list)->id])) {
                         $editCustomer[reset($list)->id]->phones = $phones;
@@ -323,6 +326,7 @@ class CheckCommand extends Command
                     }
                 }
             }
+            unset($customers);
         }
 
         // analyse
@@ -377,11 +381,17 @@ class CheckCommand extends Command
                     reset($list);
                     $resultCustomerId = key($list);
                     $combineIds = [];
+                    $combineCustomers = [];
                     foreach ($list as $id => $customer) {
                         if ($id == $resultCustomerId || $this->isExclude($customer)) {
                             continue;
                         }
                         $combineIds[] = $id;
+                        $combineCustomers[] = $customer;
+                    }
+                    // null phones
+                    if ($this->input->getOption('merge-phones')) {
+                        $this->api->nullDublicatePhones($combineCustomers, $combineIds);
                     }
 
                     if ($this->combine($resultCustomerId, $combineIds)) {
@@ -393,7 +403,7 @@ class CheckCommand extends Command
             if ($combined) {
                 $this->io->success('Combined customers: ' . $combined);
                 // wait some time, then edit customers
-                sleep(20);
+                sleep(5);
                 foreach ($duplicates as $customers) {
                     foreach ($customers as $list) {
                         reset($list);
