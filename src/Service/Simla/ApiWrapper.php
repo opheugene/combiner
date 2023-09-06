@@ -156,4 +156,29 @@ class ApiWrapper implements ApiWrapperInterface
 
         return $this->client->customers->combine($request);
     }
+
+    public function nullDublicatePhones(array $customers, array $ids)
+    {
+        $this->logger->debug(sprintf('Clear duplicates (%s) phones', print_r($ids, true)));
+        foreach ($customers as $customer) {
+            $customer->phones = [];
+            $request = new CustomersEditRequest();
+            $request->by       = ByIdentifier::ID;
+            $request->customer = $customer;
+            $request->site     = $customer->site;
+
+            try {
+                $this->client->customers->edit($customer->id, $request);
+            } catch (ApiExceptionInterface $exception) {
+                $this->logger->error(sprintf(
+                    'Error from RetailCRM API (status code: %d): %s',
+                    $exception->getStatusCode(),
+                    $exception->getMessage()
+                ));
+
+                return null;
+            }
+        }
+        $this->logger->debug(sprintf('Phones of (%s) cleared', print_r($ids, true)));
+    }
 }
