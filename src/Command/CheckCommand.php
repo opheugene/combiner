@@ -313,6 +313,9 @@ class CheckCommand extends Command
                         }
                     }
                     $phones = array_values($phones);
+                    usort($phones, function($one, $two){
+                        return strlen($two->number) <=> strlen($one->number);
+                    });
                     reset($list)->phones = $phones;
 
                     if (isset($editCustomer[reset($list)->id])) {
