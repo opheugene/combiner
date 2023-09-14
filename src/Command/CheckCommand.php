@@ -103,6 +103,15 @@ class CheckCommand extends Command
                         }
                         break;
 
+                    case 'customFieldsCount':
+                        $oneCount = count((array) ($one->customFields));
+                        $twoCount = count((array) ($two->customFields));
+
+                        if ($oneCount != $twoCount) {
+                            return $oneCount <=> $twoCount;
+                        }
+                        break;
+
                     case 'email':
                         if (empty($one->email) != empty($two->email)) {
                             return empty($one->email) <=> empty($two->email);
@@ -157,6 +166,48 @@ class CheckCommand extends Command
                         }
                         break;
                 }
+
+                if (str_contains($criteria, '.')) { // todo mb allow more recursive depth
+                    [$prefix, $code] = explode('.', $criteria, 2);
+
+                    $oneField = $twoField = null;
+
+                    if (property_exists($one, $prefix)) {
+                        if (is_array($one->$prefix)) {
+                            if (array_key_exists($code, $one->$prefix)) {
+                                $oneField = $one->$prefix->$code;
+                            }
+                        } elseif (is_object($one->$prefix)) {
+                            if (property_exists($one->$prefix, $code)) {
+                                $oneField = $one->$prefix->$code;
+                            }
+                        }
+                    }
+
+                    if (property_exists($two, $prefix)) {
+                        if (is_array($two->$prefix)) {
+                            if (array_key_exists($code, $two->$prefix)) {
+                                $twoField = $two->$prefix->$code;
+                            }
+                        } elseif (is_object($two->$prefix)) {
+                            if (property_exists($two->$prefix, $code)) {
+                                $twoField = $two->$prefix->$code;
+                            }
+                        }
+                    }
+
+                    if (empty($oneField) != empty($twoField)) {
+                        return empty($oneField) <=> empty($twoField);
+                    }
+                }
+
+                if (str_starts_with($criteria, 'site-')) {
+                    $criteriaSite = substr($criteria, 5);
+                    $oneSite = $one->site === $criteriaSite;
+                    $twoSite = $two->site === $criteriaSite;
+
+                    return empty($oneSite) <=> empty($twoSite);
+                }
             }
 
             return 0;
@@ -192,7 +243,7 @@ class CheckCommand extends Command
         $sourcePriority = [];
         $sources = explode(',', $this->input->getOption('sourcePriority')) ?? [];
         foreach ($sources as $value) {
-            list ($source, $priority) = array_pad(explode('=', $value), 2, null);
+            [$source, $priority] = array_pad(explode('=', $value), 2, null);
             if ($source && $priority) {
                 $sourcePriority[$source] = $priority;
             }
@@ -238,8 +289,11 @@ class CheckCommand extends Command
 
         // prepare lists of duplicates
         $duplicates = [];
+        $duplicatesByNameRef = [];
+
         foreach ($customersBySites as $site => $customers) {
             $site = $allSites ? 'all_sites' : $site;
+
             foreach ($customers as $id => $customer) {
                 if ('email' === $by && $customer->email && preg_match(self::EMAIL_REGEXP, $customer->email)) {
                     $duplicates[$site][$customer->email][$id] = $customer;
@@ -249,9 +303,99 @@ class CheckCommand extends Command
                             $duplicates[$site][$clearedPhone][$id] = $customer;
                         }
                     }
+                } elseif ('name' === $by) {
+                    $name = $this->getCustomerFullName($customer);
+
+                    if (count(explode(' ', $name)) < 2) {
+                        continue;
+                    }
+
+                    $duplicates[$site][$name][$id] = $customer;
+                } elseif (strpos($by, 'name-') === 0) {
+                    $number = substr($by, strlen('name-'));
+                    if (!is_numeric($number)) {
+                        continue;
+                    }
+
+                    $name = $this->getCustomerFullName($customer);
+
+                    foreach ($this->generateNameTokens($name, intval($number)) as $namePair) {
+                        $duplicatesByNameRef[$site][$id][] = $namePair;
+                        $duplicates[$site][$namePair][$id] = $customer;
+                    }
+                } elseif (str_contains($by, '.')) { // todo mb allow more recursive depth
+                    [$prefix, $code] = explode('.', $by, 2);
+
+                    if (property_exists($customer, $prefix)) {
+                        if (is_array($customer->$prefix)) {
+                            if (array_key_exists($code, $customer->$prefix)) {
+                                $duplicates[$site][preg_replace('/[^\d]/', '', $customer->$prefix[$code])][$id] =
+                                    $customer;
+                            }
+                        } elseif (is_object($customer->$prefix)) {
+                            if (property_exists($customer->$prefix, $code)) {
+                                $duplicates[$site][preg_replace('/[^\d]/', '', $customer->$prefix->$code)][$id] =
+                                    $customer;
+                            }
+                        }
+                    }
                 }
             }
         }
+
+        foreach ($duplicatesByNameRef as $site => $customerNames) {
+            foreach ($customerNames as $names) {
+                $duplicatesByName = [];
+
+                foreach ($names as $name) {
+                    if (isset($duplicates[$site][$name])) {
+                        foreach ($duplicates[$site][$name] as $id => $duplicate) {
+                            $isAnotherCustomer = false;
+
+                            foreach ($duplicatesByName as $item) {
+                                if($item->ordersCount > 0 && $duplicate->ordersCount > 0) {
+                                    $isAnotherCustomer = true;
+                                    break;
+                                }
+
+                                if($item->email && $duplicate->email && $item->email !== $duplicate-> email) {
+                                    $isAnotherCustomer = true;
+                                    break;
+                                }
+                                if($item->phones && $duplicate->phones) {
+                                    $isAnotherCustomer = true;
+                                    foreach ($item->phones as $phone) {
+                                        foreach ($duplicate->phones as $duplicatePhone) {
+                                            if ($this->clearPhone($phone) === $this->clearPhone($duplicatePhone)) {
+                                                $isAnotherCustomer = false;
+                                                break 3;
+                                            }
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+
+                            // todo mb save those clients and check for their duplicates too
+                            if (!$isAnotherCustomer) {
+                                $duplicatesByName[$id] = $duplicate;
+                            }
+                        }
+                        unset($duplicates[$site][$name]);
+                    }
+                }
+
+                if (count($duplicatesByName) === 0) {
+                    continue;
+                }
+
+                $mainCustomer = reset($duplicatesByName);
+                $name = $this->getCustomerFullName($mainCustomer);
+
+                $duplicates[$site][$name] = $duplicatesByName;
+            }
+        }
+
         // sort
         foreach ($duplicates as $site => &$customers) {
             foreach ($customers as $field => $list) {
@@ -470,18 +614,23 @@ class CheckCommand extends Command
         $array = [];
 
         foreach ($this->fields as $path) {
+            if($path === 'fullName') {
+                $array[] = $this->getCustomerFullName($customer);
+                continue;
+            }
+
             $array[] = array_reduce(
                 explode('.', $path),
                 function ($o, $p) {
-                    return !is_null($o) ? (is_array($o->$p) ? json_encode($o->$p) : $o->$p) : null;
-//                    if (!is_null($o)) {
-//                        if (is_array($o->$p) || is_object($o->$p)) {
-//                            return json_encode($o->$p);
-//                        } else {
-//                            return $o->$p;
-//                        }
-//                    }
-//                    return null;
+                    if (!is_null($o)) {
+                        if (is_object($o) && property_exists($o, $p)) {
+                            return (is_array($o->$p) ? json_encode($o->$p) : $o->$p);
+                        } elseif (is_array($o) && array_key_exists($p, $o)) {
+                            return (is_array($o[$p]) ? json_encode($o[$p]) : $o[$p]);
+                        }
+                    }
+
+                    return null;
                 },
                 $customer
             );
@@ -502,6 +651,51 @@ class CheckCommand extends Command
         }
 
         return $ph;
+    }
+
+    protected function generateNameTokens(string $name, int $minCount = 2): array
+    {
+        $words = explode(' ', $name);
+        $count = count($words);
+
+        if ($count < $minCount) {
+            return [];
+        }
+
+        sort($words);
+
+        $tokens = [];
+        for ($i = 0; $i < $count - 1; $i++) {
+            for ($j = $i + 1; $j < $count; $j++) {
+                // todo refactor
+                if ($minCount == 2) {
+                    $tokens[]  = implode(' ', [$words[$i], $words[$j]]);
+                } else {
+                    for ($k = $j + 1; $k < $count; $k++) {
+                        $tokens[]  = implode(' ', [$words[$i], $words[$j], $words[$k]]);
+                    }
+                }
+            }
+        }
+
+        return $tokens;
+    }
+
+    protected function getCustomerFullName($customer): string
+    {
+        return
+            mb_strtolower(
+                preg_replace(
+                    '/\s+/u', ' ',
+                    trim(
+                        implode(' ', [
+                            $customer->firstName,
+                            $customer->lastName,
+                            $customer->patronymic,
+                        ])
+                    )
+                )
+            );
     }
 
     protected function getCrmName($crmUrl)
