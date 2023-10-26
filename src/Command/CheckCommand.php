@@ -4,6 +4,7 @@ namespace App\Command;
 
 use App\Service\Simla\ApiWrapper;
 use App\Service\Simla\ApiWrapperFactory;
+use Psr\Log\LoggerInterface;
 use RetailCrm\Api\Enum\ByIdentifier;
 use RetailCrm\Api\Model\Entity\Customers\Customer;
 use Symfony\Component\Console\Command\Command;
@@ -54,10 +55,14 @@ class CheckCommand extends Command
     /** @var Table $table */
     private $table;
 
-    public function __construct(ParameterBagInterface $params, ApiWrapperFactory $factory)
+    /** @var LoggerInterface $combinerLogger */
+    private $combinerLogger;
+
+    public function __construct(ParameterBagInterface $params, ApiWrapperFactory $factory, LoggerInterface $combinerLogger)
     {
         $this->params = $params;
         $this->factory = $factory;
+        $this->combinerLogger = $combinerLogger;
 
         parent::__construct();
     }
@@ -282,6 +287,8 @@ class CheckCommand extends Command
             $this->io->note('You have not set any criteria for comparing customers');
         }
 
+        $this->combinerLogger->info(sprintf('Start combining for %s', $this->input->getOption('crmUrl')));
+
         // get customers by sites
         $noCache = $this->input->getOption('no-cache');
         $allSites = $this->input->getOption('all-sites');
@@ -477,6 +484,7 @@ class CheckCommand extends Command
         }
 
         // analyse
+        $this->combinerLogger->info(sprintf('List of duplicates by %s', $by));
         if ($this->fields) {
             foreach ($duplicates as $site => $customers) {
                 $this->table = $this->io->createTable();
@@ -487,6 +495,12 @@ class CheckCommand extends Command
                     $this->addLineToTable('Duplicates by ' . $by . ' ' . $field . ': ' . count($list));
                     $this->addRowsToTable($list);
                     $this->table->addRow(new TableSeparator());
+
+                    $this->combinerLogger->debug(
+                        sprintf('%s - Customer: %d, duplicates: %s',
+                            $field,
+                            reset($list)->id,
+                            json_encode($list)));
                 }
                 $this->table->render();
                 $this->io->writeln('');
