@@ -79,6 +79,7 @@ class CheckCommand extends Command
             ->addOption('combine', null, InputOption::VALUE_NONE, 'Do combine duplicates of clients')
             ->addOption('merge-managers', null, InputOption::VALUE_NONE, 'Merge duplicates managers to client')
             ->addOption('merge-phones', null, InputOption::VALUE_REQUIRED, 'Merge numbers to number with country code')
+            ->addOption('collectEmails', null, InputOption::VALUE_REQUIRED, 'Collect all emails in resulting customer custom field')
 
             ->addOption('phoneExactLength', null, InputOption::VALUE_REQUIRED, 'Number of digits for phoneExactLength criteria')
             ->addOption('sourcePriority', null, InputOption::VALUE_REQUIRED, 'Priority of sources for sourcePriority criteria')
@@ -476,6 +477,39 @@ class CheckCommand extends Command
                         $customer->id = reset($list)->id;
                         $customer->site = reset($list)->site;
                         $customer->phones = $phones;
+                        $editCustomer[reset($list)->id] = $customer;
+                    }
+                }
+            }
+            unset($customers);
+        }
+
+        // collect emails
+        if ($this->input->getOption('collectEmails')) {
+            $customField = $this->input->getOption('collectEmails');
+            foreach ($duplicates as &$customers) {
+                foreach ($customers as $list) {
+                    $emails = array();
+                    foreach ($list as $item) {
+                        $emails[] = $item->email;
+                        if (isset($item->customFields[$customField])) {
+                            foreach (explode('; ', $item->customFields[$customField]) as $secondEmail) {
+                                $emails[] = $secondEmail;
+                            }
+                        }
+                    }
+
+                    $emails = array_unique($emails);
+                    unset($emails[array_search(current($list)->email, $emails, true)]);
+                    reset($list)->customFields[$customField] = implode('; ', $emails);
+
+                    if (isset($editCustomer[reset($list)->id])) {
+                        $editCustomer[reset($list)->id]->customFields[$customField] = implode('; ', $emails);
+                    } else {
+                        $customer = new Customer();
+                        $customer->id = reset($list)->id;
+                        $customer->site = reset($list)->site;
+                        $customer->customFields[$customField] = implode('; ', $emails);
                         $editCustomer[reset($list)->id] = $customer;
                     }
                 }
