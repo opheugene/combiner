@@ -491,16 +491,15 @@ class CheckCommand extends Command
                 foreach ($customers as $list) {
                     $emails = array();
                     foreach ($list as $item) {
-                        $emails[] = $item->email;
+                        $emails[$item->email] = $item->email;
                         if (isset($item->customFields[$customField])) {
                             foreach (explode('; ', $item->customFields[$customField]) as $secondEmail) {
-                                $emails[] = $secondEmail;
+                                $emails[$secondEmail] = $secondEmail;
                             }
                         }
                     }
 
-                    $emails = array_unique($emails);
-                    unset($emails[array_search(current($list)->email, $emails, true)]);
+                    unset($emails[current($list)->email]);
                     reset($list)->customFields[$customField] = implode('; ', $emails);
 
                     if (isset($editCustomer[reset($list)->id])) {
