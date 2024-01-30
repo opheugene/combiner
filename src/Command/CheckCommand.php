@@ -16,6 +16,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
+use Symfony\Component\Yaml\Yaml;
 
 class CheckCommand extends Command
 {
@@ -72,6 +73,7 @@ class CheckCommand extends Command
         $this
             ->addArgument('by', InputArgument::REQUIRED, 'By which field to search for duplicates')
             ->addArgument('criteria', InputArgument::IS_ARRAY, 'Customer comparison criteria')
+            ->addOption('config', '-c', InputOption::VALUE_REQUIRED, 'File with all command options')
             ->addOption('fields', null, InputOption::VALUE_REQUIRED, 'Fields to show in report, comma separated')
             ->addOption('all-sites', null, InputOption::VALUE_NONE, 'Look for duplicates in all sites')
             ->addOption('no-cache', null, InputOption::VALUE_NONE, 'Get data without cache')
@@ -80,6 +82,7 @@ class CheckCommand extends Command
             ->addOption('merge-managers', null, InputOption::VALUE_NONE, 'Merge duplicates managers to client')
             ->addOption('merge-phones', null, InputOption::VALUE_REQUIRED, 'Merge numbers to number with country code')
             ->addOption('collectEmails', null, InputOption::VALUE_REQUIRED, 'Collect all emails in resulting customer custom field')
+            ->addOption('importantFields', null, InputOption::VALUE_REQUIRED, 'Other important fields, that needs to be combined')
 
             ->addOption('phoneExactLength', null, InputOption::VALUE_REQUIRED, 'Number of digits for phoneExactLength criteria')
             ->addOption('sourcePriority', null, InputOption::VALUE_REQUIRED, 'Priority of sources for sourcePriority criteria')
@@ -272,6 +275,11 @@ class CheckCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $this->input = $input;
+
+        if ($input->getOption('config')) {
+            $this->readConfig($input->getOption('config'));
+        }
+
         $this->io = new SymfonyStyle($input, $output);
 
         $by = $this->input->getArgument('by');
@@ -516,6 +524,54 @@ class CheckCommand extends Command
             unset($customers);
         }
 
+        // collect important fields
+        if ($this->input->getOption('importantFields')) {
+            $importantFields = $this->input->getOption('importantFields') ? explode(',', $this->input->getOption('importantFields')) : [];
+            foreach ($duplicates as $customers) {
+                foreach ($customers as $list) {
+                    $customerImportantFields = array();
+
+                    foreach ($list as $item) {
+                        foreach ($importantFields as $importantField) {
+                            $field = str_replace('customField.', '', $importantField);
+
+                            if (!isset($customerImportantFields[$importantField])) {
+                                if (isset($item->customFields[$field]) && str_contains($importantField, 'customField.')) {
+                                    $customerImportantFields[$importantField] = $item->customFields[$field];
+                                } elseif (isset($item->$field)) {
+                                    $customerImportantFields[$importantField] = $item->$field;
+                                }
+                            }
+                        }
+                    }
+
+                    if (isset($editCustomer[reset($list)->id])) {
+                        foreach ($customerImportantFields as $key => $field) {
+                            if (str_contains($key, 'customField.')) {
+                                $key = str_replace('customField.', '', $key);
+                                $editCustomer[reset($list)->id]->customFields[$key] = $field;
+                            } else {
+                                $editCustomer[reset($list)->id]->$key = $field;
+                            }
+                        }
+                    } else {
+                        $customer = new Customer();
+                        $customer->id = reset($list)->id;
+                        $customer->site = reset($list)->site;
+                        foreach ($customerImportantFields as $key => $field) {
+                            if (str_contains($key, 'customField.')) {
+                                $key = str_replace('customField.', '', $key);
+                                $customer->customFields[$key] = $field;
+                            } else {
+                                $customer->$key = $field;
+                            }
+                        }
+                        $editCustomer[reset($list)->id] = $customer;
+                    }
+                }
+            }
+        }
+
         // analyse
         $this->combinerLogger->info(sprintf('List of duplicates by %s', $by));
         if ($this->fields) {
@@ -748,5 +804,21 @@ class CheckCommand extends Command
     protected function getCrmName($crmUrl)
     {
         return str_replace('.', '_', str_replace(['/', 'http:', 'https:'], '', $crmUrl));
+    }
+
+    protected function readConfig(string $configFilePath): void
+    {
+        $config = Yaml::parseFile($configFilePath);
+
+        foreach ($config['arguments'] as $key => $argument) {
+            if (!$this->input->getArgument($key)) {
+                $this->input->setArgument($key, $argument);
+            }
+        }
+        foreach ($config['options'] as $key => $option) {
+            if (!$this->input->getOption($key)) {
+                $this->input->setOption($key, $option);
+            }
+        }
     }
 }

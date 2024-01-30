@@ -49,7 +49,20 @@ To merge managers add `--merge-managers`
 ```
 bin/console duplicates:by phone externalId ordersCount email phone createdAt --csv --merge-managers
 ```
+
+To merge other customer fields add `--importantFields`
+```
+bin/console duplicates:by email externalId ordersCount email createdAt --csv --importantFields=customField.cedula,birthday
+```
+
 To periodically execute the command on CRON:
 ```
 bin/console duplicates:by phone externalId ordersCount email phone createdAt --combine --no-cache
+```
+
+**Command arguments and options:**
+
+To call command with arguments and options from config file, use `-c` or `--config` with path to config.yaml file
+```
+bin/console duplicates:by phone -c ./configFile.yaml
 ```
