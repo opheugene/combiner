@@ -1,0 +1,15 @@
+arguments:
+    criteria:
+        - ordersCount
+        - externalId
+        - createdAt
+
+options:
+    crmUrl: 'https://example.com'
+    apiKey: 'apikeystring'
+    fields: 'id,phones,externalId,firstName,lastName,email,ordersCount'
+    mergeFields: 'customField.cedula,birthday'
+
+    all-sites: true
+    no-cache: true
+    csv: true
