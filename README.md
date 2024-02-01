@@ -50,9 +50,9 @@ To merge managers add `--merge-managers`
 bin/console duplicates:by phone externalId ordersCount email phone createdAt --csv --merge-managers
 ```
 
-To merge other customer fields add `--importantFields`
+To merge other customer fields add `--mergeFields`
 ```
-bin/console duplicates:by email externalId ordersCount email createdAt --csv --importantFields=customField.cedula,birthday
+bin/console duplicates:by email externalId ordersCount email createdAt --csv --mergeFields=customField.cedula,birthday
 ```
 
 To periodically execute the command on CRON:

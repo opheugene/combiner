@@ -82,7 +82,7 @@ class CheckCommand extends Command
             ->addOption('merge-managers', null, InputOption::VALUE_NONE, 'Merge duplicates managers to client')
             ->addOption('merge-phones', null, InputOption::VALUE_REQUIRED, 'Merge numbers to number with country code')
             ->addOption('collectEmails', null, InputOption::VALUE_REQUIRED, 'Collect all emails in resulting customer custom field')
-            ->addOption('importantFields', null, InputOption::VALUE_REQUIRED, 'Other important fields, that needs to be combined')
+            ->addOption('mergeFields', null, InputOption::VALUE_REQUIRED, 'Other fields, that needs to be merged')
 
             ->addOption('phoneExactLength', null, InputOption::VALUE_REQUIRED, 'Number of digits for phoneExactLength criteria')
             ->addOption('sourcePriority', null, InputOption::VALUE_REQUIRED, 'Priority of sources for sourcePriority criteria')
@@ -524,29 +524,29 @@ class CheckCommand extends Command
             unset($customers);
         }
 
-        // collect important fields
-        if ($this->input->getOption('importantFields')) {
-            $importantFields = $this->input->getOption('importantFields') ? explode(',', $this->input->getOption('importantFields')) : [];
+        // other fields to merge
+        if ($this->input->getOption('mergeFields')) {
+            $mergeFields = $this->input->getOption('mergeFields') ? explode(',', $this->input->getOption('mergeFields')) : [];
             foreach ($duplicates as $customers) {
                 foreach ($customers as $list) {
-                    $customerImportantFields = array();
+                    $customerMergeFields = array();
 
                     foreach ($list as $item) {
-                        foreach ($importantFields as $importantField) {
-                            $field = str_replace('customField.', '', $importantField);
+                        foreach ($mergeFields as $mergeField) {
+                            $field = str_replace('customField.', '', $mergeField);
 
-                            if (!isset($customerImportantFields[$importantField])) {
-                                if (isset($item->customFields[$field]) && str_contains($importantField, 'customField.')) {
-                                    $customerImportantFields[$importantField] = $item->customFields[$field];
+                            if (!isset($customerMergeFields[$mergeField])) {
+                                if (isset($item->customFields[$field]) && str_contains($mergeField, 'customField.')) {
+                                    $customerMergeFields[$mergeField] = $item->customFields[$field];
                                 } elseif (isset($item->$field)) {
-                                    $customerImportantFields[$importantField] = $item->$field;
+                                    $customerMergeFields[$mergeField] = $item->$field;
                                 }
                             }
                         }
                     }
 
                     if (isset($editCustomer[reset($list)->id])) {
-                        foreach ($customerImportantFields as $key => $field) {
+                        foreach ($customerMergeFields as $key => $field) {
                             if (str_contains($key, 'customField.')) {
                                 $key = str_replace('customField.', '', $key);
                                 $editCustomer[reset($list)->id]->customFields[$key] = $field;
@@ -558,7 +558,7 @@ class CheckCommand extends Command
                         $customer = new Customer();
                         $customer->id = reset($list)->id;
                         $customer->site = reset($list)->site;
-                        foreach ($customerImportantFields as $key => $field) {
+                        foreach ($customerMergeFields as $key => $field) {
                             if (str_contains($key, 'customField.')) {
                                 $key = str_replace('customField.', '', $key);
                                 $customer->customFields[$key] = $field;
