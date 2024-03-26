@@ -83,6 +83,7 @@ class CheckCommand extends Command
             ->addOption('merge-phones', null, InputOption::VALUE_REQUIRED, 'Merge numbers to number with country code')
             ->addOption('collectEmails', null, InputOption::VALUE_REQUIRED, 'Collect all emails in resulting customer custom field')
             ->addOption('mergeFields', null, InputOption::VALUE_REQUIRED, 'Other fields, that needs to be merged')
+            ->addOption('consider-orders', null, InputOption::VALUE_NONE, 'Consider order parameters')
 
             ->addOption('phoneExactLength', null, InputOption::VALUE_REQUIRED, 'Number of digits for phoneExactLength criteria')
             ->addOption('sourcePriority', null, InputOption::VALUE_REQUIRED, 'Priority of sources for sourcePriority criteria')
@@ -221,6 +222,78 @@ class CheckCommand extends Command
 
             return 0;
         });
+
+        return $list;
+    }
+
+    // sort clients consider their orders
+    protected function sortConsiderOrders($list)
+    {
+        $orderParameters = $this->input->getOption('consider-orders');
+
+        uasort($list, function($one, $two) use ($orderParameters) {
+            foreach ($orderParameters as $criteria => $value) {
+                switch (true) {
+                    case $criteria === 'createdAt':
+                        $onesOrder = $this->api->getLastCustomerOrder($one->id);
+                        $twosOrder = $this->api->getLastCustomerOrder($two->id);
+
+                        if (empty($onesOrder->createdAt) != empty($twosOrder->createdAt)) {
+                            return empty($twosOrder->createdAt) <=> empty($onesOrder->createdAt);
+                        }
+                        if (!empty($onesOrder->createdAt) && !empty($onesOrder->createdAt->date) && !empty($onesOrder->createdAt->timezone)
+                            && !empty($twosOrder->createdAt) && !empty($twosOrder->createdAt->date) && !empty($twosOrder->createdAt->timezone)
+                        ) {
+                            $oneCreatedAt = new \DateTimeImmutable($onesOrder->createdAt->date, new \DateTimeZone($onesOrder->createdAt->timezone));
+                            $twoCreatedAt = new \DateTimeImmutable($twosOrder->createdAt->date, new \DateTimeZone($twosOrder->createdAt->timezone));
+                            if ($oneCreatedAt->getTimestamp() != $twoCreatedAt->getTimestamp()) {
+                                return $oneCreatedAt->getTimestamp() <=> $twoCreatedAt->getTimestamp();
+                            }
+                        }
+                        break;
+
+                    case is_array($value):
+                        $onesOrders = $this->api->getCustomerOrders($one->id);
+                        $twosOrders = $this->api->getCustomerOrders($two->id);
+
+                        $onesSortedOrders = [];
+                        $twosSortedOrders = [];
+                        foreach ($value as $val) {
+                            $sortedByVal = array_filter($onesOrders, static function($order) use ($criteria, $val) {
+                                return $order->$criteria == $val;
+                            });
+
+                            if (!empty($sortedByVal)) {
+                                $onesSortedOrders[] = $sortedByVal;
+                            }
+
+                            $sortedByVal = array_filter($twosOrders, static function($order) use ($criteria, $val) {
+                                return $order->$criteria == $val;
+                            });
+
+                            if (!empty($sortedByVal)) {
+                                $twosSortedOrders[] = $sortedByVal;
+                            }
+                        }
+
+                        if (empty($onesSortedOrders) && empty($twosSortedOrders)) {
+                            return 0;
+                        }
+
+                        if (empty($onesSortedOrders) != empty($twosSortedOrders)) {
+                            return empty($onesSortedOrders) <=> empty($twosSortedOrders);
+                        }
+
+                        $onesMostImportantOrder = current(current($onesSortedOrders));
+                        $twosMostImportantOrder = current(current($twosSortedOrders));
+
+                        return array_keys($value, $onesMostImportantOrder->$criteria) <=> array_keys($value, $twosMostImportantOrder->$criteria);
+                }
+            }
+
+            return 0;
+        });
+
 
         return $list;
     }
@@ -426,6 +499,17 @@ class CheckCommand extends Command
             }
         }
         unset($customers);
+
+        // sort consider customer orders
+        if ($this->input->getOption('consider-orders')) {
+            foreach ($duplicates as &$customers) {
+                foreach ($customers as $field => $list) {
+                    $customers[$field] = $this->sortConsiderOrders($list);
+                }
+            }
+            unset($customers);
+        }
+
 
         $editCustomer = [];
         // merge managers

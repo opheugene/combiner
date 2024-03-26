@@ -7,9 +7,12 @@ use RetailCrm\Api\Client;
 use RetailCrm\Api\Enum\ByIdentifier;
 use RetailCrm\Api\Interfaces\ApiExceptionInterface;
 use RetailCrm\Api\Model\Entity\Customers\SerializedCustomerReference;
+use RetailCrm\Api\Model\Entity\Orders\Order;
+use RetailCrm\Api\Model\Filter\Orders\OrderFilter;
 use RetailCrm\Api\Model\Request\Customers\CustomersCombineRequest;
 use RetailCrm\Api\Model\Request\Customers\CustomersEditRequest;
 use RetailCrm\Api\Model\Request\Customers\CustomersRequest;
+use RetailCrm\Api\Model\Request\Orders\OrdersRequest;
 
 class ApiWrapper implements ApiWrapperInterface
 {
@@ -125,7 +128,7 @@ class ApiWrapper implements ApiWrapperInterface
         }
 
         if ($by === ByIdentifier::EXTERNAL_ID) {
-             $this->logger->info('Customer edited: externalId#' . $customer->externalId);
+            $this->logger->info('Customer edited: externalId#' . $customer->externalId);
         } else {
             $this->logger->info('Customer edited: id#' . $customer->id);
         }
@@ -180,5 +183,41 @@ class ApiWrapper implements ApiWrapperInterface
             }
         }
         $this->logger->debug(sprintf('Phones of (%s) cleared', print_r($ids, true)));
+    }
+
+    /**
+     * @param int $customerId
+     * @return Order[]|null
+     * @throws \RetailCrm\Api\Exception\Client\HandlerException
+     * @throws \RetailCrm\Api\Exception\Client\HttpClientException
+     * @throws \RetailCrm\Api\Interfaces\ClientExceptionInterface
+     */
+    public function getCustomerOrders(int $customerId): ?array
+    {
+        $this->logger->debug(sprintf('Get customer %d orders', $customerId));
+        $request =  new OrdersRequest();
+        $request->filter = new OrderFilter();
+        $request->filter->customerId = $customerId;
+
+        try {
+            $response = $this->client->orders->list($request);
+        } catch (ApiExceptionInterface $exception) {
+            $this->logger->error(sprintf(
+                'Error from RetailCRM API (status code: %d): %s',
+                $exception->getStatusCode(),
+                $exception->getMessage()
+            ));
+
+            return null;
+        }
+
+        $this->logger->debug(sprintf('Customer %d have %d orders', $customerId, count($response->orders)));
+
+        return $response->orders;
+    }
+
+    public function getLastCustomerOrder(int $customerId): ?Order
+    {
+        return current($this->getCustomerOrders($customerId)) ?: null;
     }
 }
