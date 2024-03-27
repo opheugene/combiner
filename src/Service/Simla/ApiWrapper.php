@@ -10,6 +10,7 @@ use RetailCrm\Api\Model\Entity\Customers\SerializedCustomerReference;
 use RetailCrm\Api\Model\Request\Customers\CustomersCombineRequest;
 use RetailCrm\Api\Model\Request\Customers\CustomersEditRequest;
 use RetailCrm\Api\Model\Request\Customers\CustomersRequest;
+use RetailCrm\Api\Model\Request\Orders\OrdersRequest;
 
 class ApiWrapper implements ApiWrapperInterface
 {
@@ -125,7 +126,7 @@ class ApiWrapper implements ApiWrapperInterface
         }
 
         if ($by === ByIdentifier::EXTERNAL_ID) {
-             $this->logger->info('Customer edited: externalId#' . $customer->externalId);
+            $this->logger->info('Customer edited: externalId#' . $customer->externalId);
         } else {
             $this->logger->info('Customer edited: id#' . $customer->id);
         }
@@ -180,5 +181,55 @@ class ApiWrapper implements ApiWrapperInterface
             }
         }
         $this->logger->debug(sprintf('Phones of (%s) cleared', print_r($ids, true)));
+    }
+
+    /**
+     * @param bool $noCache
+     * @return array|mixed
+     * @throws ApiExceptionInterface
+     * @throws \RetailCrm\Api\Interfaces\ClientExceptionInterface
+     */
+    public function getCachedOrdersBySite(bool $noCache = false)
+    {
+        $ordersFile = $this->cachedDataPath . '/' . str_replace(['/', ':', 'https'], '', $this->apiUrl) . '_orders.json';
+        if (false === $noCache && file_exists($ordersFile)) {
+            $orders = json_decode(file_get_contents($ordersFile));
+
+        } else {
+            try {
+
+                $page = 1;
+                $orders = [];
+
+                while (true) {
+                    $request = new OrdersRequest();
+                    $request->page = $page;
+                    $request->limit = 100;
+
+                    $response = $this->client->orders->list($request);
+                    foreach ($response->orders as $order) {
+                        $orders[$order->site ?? '_'][$order->customer->id][] = $order;
+                    }
+
+                    ++$page;
+                    if ($page > $response->pagination->totalPageCount) {
+                        break;
+                    }
+                }
+
+            } catch (\Exception $e) {
+                $this->logger->error(sprintf(
+                    'Error from Simla API (status code: %d): %s',
+                    $e->getStatusCode(),
+                    $e->getMessage()
+                ));
+
+                return [];
+            }
+
+            file_put_contents($ordersFile, json_encode($orders));
+        }
+
+        return $orders;
     }
 }

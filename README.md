@@ -55,6 +55,30 @@ To merge other customer fields add `--mergeFields`
 bin/console duplicates:by email externalId ordersCount email createdAt --csv --mergeFields=customField.cedula,birthday
 ```
 
+To check customer orders parameters add `--consider-orders`. Example for configFile.yaml:
+```
+arguments:
+    criteria:
+        - ordersCount
+        - createdAt
+
+options:
+    crmUrl: 'crmUrl'
+    apiKey: 'apiKey'
+    fields: 'id,email,site'
+    consider-orders:
+        orderType:
+            - 'mostImportantType'
+            - 'type'
+            - 'lessImportantType'
+        createdAt: true
+
+
+    all-sites: true
+    no-cache: true
+    csv: true
+```
+
 To periodically execute the command on CRON:
 ```
 bin/console duplicates:by phone externalId ordersCount email phone createdAt --combine --no-cache
