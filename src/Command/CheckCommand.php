@@ -156,17 +156,9 @@ class CheckCommand extends Command
                         break;
 
                     case 'createdAt':
-                        if (empty($one->createdAt) != empty($two->createdAt)) {
-                            return empty($two->createdAt) <=> empty($one->createdAt);
-                        }
-                        if (!empty($one->createdAt) && !empty($one->createdAt->date) && !empty($one->createdAt->timezone)
-                            && !empty($two->createdAt) && !empty($two->createdAt->date) && !empty($two->createdAt->timezone)
-                        ) {
-                            $oneCreatedAt = new \DateTimeImmutable($one->createdAt->date, new \DateTimeZone($one->createdAt->timezone));
-                            $twoCreatedAt = new \DateTimeImmutable($two->createdAt->date, new \DateTimeZone($two->createdAt->timezone));
-                            if ($oneCreatedAt->getTimestamp() != $twoCreatedAt->getTimestamp()) {
-                                return $oneCreatedAt->getTimestamp() <=> $twoCreatedAt->getTimestamp();
-                            }
+                        $result = $this->compareCreatedAt($one, $two);
+                        if ($result !== null) {
+                            return $result;
                         }
                         break;
 
@@ -226,35 +218,45 @@ class CheckCommand extends Command
         return $list;
     }
 
+    protected function compareCreatedAt($one, $two): ?int
+    {
+        if (empty($one->createdAt) != empty($two->createdAt)) {
+            return empty($two->createdAt) <=> empty($one->createdAt);
+        }
+        if (!empty($one->createdAt) && !empty($one->createdAt->date) && !empty($one->createdAt->timezone)
+            && !empty($two->createdAt) && !empty($two->createdAt->date) && !empty($two->createdAt->timezone)
+        ) {
+            $oneCreatedAt = new \DateTimeImmutable($one->createdAt->date, new \DateTimeZone($one->createdAt->timezone));
+            $twoCreatedAt = new \DateTimeImmutable($two->createdAt->date, new \DateTimeZone($two->createdAt->timezone));
+            if ($oneCreatedAt->getTimestamp() != $twoCreatedAt->getTimestamp()) {
+                return $oneCreatedAt->getTimestamp() <=> $twoCreatedAt->getTimestamp();
+            }
+        }
+
+        return null;
+    }
+
     // sort clients consider their orders
-    protected function sortConsiderOrders($list)
+    protected function sortConsiderOrders($list, $orders)
     {
         $orderParameters = $this->input->getOption('consider-orders');
 
-        uasort($list, function($one, $two) use ($orderParameters) {
+        uasort($list, function($one, $two) use ($orderParameters, $orders) {
             foreach ($orderParameters as $criteria => $value) {
                 switch (true) {
                     case $criteria === 'createdAt':
-                        $onesOrder = $this->api->getLastCustomerOrder($one->id);
-                        $twosOrder = $this->api->getLastCustomerOrder($two->id);
+                        $onesOrder = current($orders[$one->id] ?? []);
+                        $twosOrder = current($orders[$two->id] ?? []);
 
-                        if (empty($onesOrder->createdAt) != empty($twosOrder->createdAt)) {
-                            return empty($twosOrder->createdAt) <=> empty($onesOrder->createdAt);
-                        }
-                        if (!empty($onesOrder->createdAt) && !empty($onesOrder->createdAt->date) && !empty($onesOrder->createdAt->timezone)
-                            && !empty($twosOrder->createdAt) && !empty($twosOrder->createdAt->date) && !empty($twosOrder->createdAt->timezone)
-                        ) {
-                            $oneCreatedAt = new \DateTimeImmutable($onesOrder->createdAt->date, new \DateTimeZone($onesOrder->createdAt->timezone));
-                            $twoCreatedAt = new \DateTimeImmutable($twosOrder->createdAt->date, new \DateTimeZone($twosOrder->createdAt->timezone));
-                            if ($oneCreatedAt->getTimestamp() != $twoCreatedAt->getTimestamp()) {
-                                return $oneCreatedAt->getTimestamp() <=> $twoCreatedAt->getTimestamp();
-                            }
+                        $result = $this->compareCreatedAt($onesOrder, $twosOrder);
+                        if ($result !== null) {
+                            return $result;
                         }
                         break;
 
                     case is_array($value):
-                        $onesOrders = $this->api->getCustomerOrders($one->id);
-                        $twosOrders = $this->api->getCustomerOrders($two->id);
+                        $onesOrders = $orders[$one->id] ?? [];
+                        $twosOrders = $orders[$two->id] ?? [];
 
                         $onesSortedOrders = [];
                         $twosSortedOrders = [];
@@ -502,9 +504,10 @@ class CheckCommand extends Command
 
         // sort consider customer orders
         if ($this->input->getOption('consider-orders')) {
-            foreach ($duplicates as &$customers) {
+            $orders = $this->api->getCachedOrdersBySite($noCache);
+            foreach ($duplicates as $site => &$customers) {
                 foreach ($customers as $field => $list) {
-                    $customers[$field] = $this->sortConsiderOrders($list);
+                    $customers[$field] = $this->sortConsiderOrders($list, $orders[$site]);
                 }
             }
             unset($customers);

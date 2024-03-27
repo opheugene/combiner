@@ -7,8 +7,6 @@ use RetailCrm\Api\Client;
 use RetailCrm\Api\Enum\ByIdentifier;
 use RetailCrm\Api\Interfaces\ApiExceptionInterface;
 use RetailCrm\Api\Model\Entity\Customers\SerializedCustomerReference;
-use RetailCrm\Api\Model\Entity\Orders\Order;
-use RetailCrm\Api\Model\Filter\Orders\OrderFilter;
 use RetailCrm\Api\Model\Request\Customers\CustomersCombineRequest;
 use RetailCrm\Api\Model\Request\Customers\CustomersEditRequest;
 use RetailCrm\Api\Model\Request\Customers\CustomersRequest;
@@ -186,38 +184,52 @@ class ApiWrapper implements ApiWrapperInterface
     }
 
     /**
-     * @param int $customerId
-     * @return Order[]|null
-     * @throws \RetailCrm\Api\Exception\Client\HandlerException
-     * @throws \RetailCrm\Api\Exception\Client\HttpClientException
+     * @param bool $noCache
+     * @return array|mixed
+     * @throws ApiExceptionInterface
      * @throws \RetailCrm\Api\Interfaces\ClientExceptionInterface
      */
-    public function getCustomerOrders(int $customerId): ?array
+    public function getCachedOrdersBySite(bool $noCache = false)
     {
-        $this->logger->debug(sprintf('Get customer %d orders', $customerId));
-        $request =  new OrdersRequest();
-        $request->filter = new OrderFilter();
-        $request->filter->customerId = $customerId;
+        $ordersFile = $this->cachedDataPath . '/' . str_replace(['/', ':', 'https'], '', $this->apiUrl) . '_orders.json';
+        if (false === $noCache && file_exists($ordersFile)) {
+            $orders = json_decode(file_get_contents($ordersFile));
 
-        try {
-            $response = $this->client->orders->list($request);
-        } catch (ApiExceptionInterface $exception) {
-            $this->logger->error(sprintf(
-                'Error from RetailCRM API (status code: %d): %s',
-                $exception->getStatusCode(),
-                $exception->getMessage()
-            ));
+        } else {
+            try {
 
-            return null;
+                $page = 1;
+                $orders = [];
+
+                while (true) {
+                    $request = new OrdersRequest();
+                    $request->page = $page;
+                    $request->limit = 100;
+
+                    $response = $this->client->orders->list($request);
+                    foreach ($response->orders as $order) {
+                        $orders[$order->site ?? '_'][$order->customer->id][] = $order;
+                    }
+
+                    ++$page;
+                    if ($page > $response->pagination->totalPageCount) {
+                        break;
+                    }
+                }
+
+            } catch (\Exception $e) {
+                $this->logger->error(sprintf(
+                    'Error from Simla API (status code: %d): %s',
+                    $e->getStatusCode(),
+                    $e->getMessage()
+                ));
+
+                return [];
+            }
+
+            file_put_contents($ordersFile, json_encode($orders));
         }
 
-        $this->logger->debug(sprintf('Customer %d have %d orders', $customerId, count($response->orders)));
-
-        return $response->orders;
-    }
-
-    public function getLastCustomerOrder(int $customerId): ?Order
-    {
-        return current($this->getCustomerOrders($customerId)) ?: null;
+        return $orders;
     }
 }
