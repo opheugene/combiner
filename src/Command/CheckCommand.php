@@ -7,6 +7,7 @@ use App\Service\Simla\ApiWrapperFactory;
 use Psr\Log\LoggerInterface;
 use RetailCrm\Api\Enum\ByIdentifier;
 use RetailCrm\Api\Model\Entity\Customers\Customer;
+use RetailCrm\Api\Model\Entity\Customers\MGCustomer;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\TableSeparator;
 use Symfony\Component\Console\Input\InputArgument;
@@ -87,6 +88,7 @@ class CheckCommand extends Command
 
             ->addOption('phoneExactLength', null, InputOption::VALUE_REQUIRED, 'Number of digits for phoneExactLength criteria')
             ->addOption('sourcePriority', null, InputOption::VALUE_REQUIRED, 'Priority of sources for sourcePriority criteria')
+            ->addOption('exclude', null, InputOption::VALUE_REQUIRED, 'Lines that should not be combined')
 
             ->addOption('crmUrl', null, InputOption::VALUE_REQUIRED, 'Simla.com URL')
             ->addOption('apiKey', null, InputOption::VALUE_REQUIRED, 'Simla.com API Key')
@@ -167,6 +169,20 @@ class CheckCommand extends Command
                             return $this->countFilledFields($two) <=> $this->countFilledFields($one);
                         }
                         break;
+
+                    case 'hasChat':
+                        if (empty($one->mgCustomers) != empty($two->mgCustomers)) {
+                            return empty($one->mgCustomers) <=> empty($two->mgCustomers);
+                        } elseif (!empty($one->mgCustomers) && !empty($two->mgCustomers)) {
+                            return $this->hasActiveChannel($two->mgCustomers) <=> $this->hasActiveChannel($one->mgCustomers);
+                        }
+                        break;
+
+                    default:
+                        if (empty($one->$criteria) != empty($two->$criteria)) {
+                            return empty($one->$criteria) <=> empty($two->$criteria);
+                        }
+                        break;    
                 }
 
                 if (str_contains($criteria, '.')) { // todo mb allow more recursive depth
@@ -387,10 +403,20 @@ class CheckCommand extends Command
 
             foreach ($customers as $id => $customer) {
                 if ('email' === $by && $customer->email && preg_match(self::EMAIL_REGEXP, $customer->email)) {
+                    if ($this->input->getOption('exclude') && $customer->email === $this->input->getOption('exclude')) {
+                        continue;
+                    }
+
                     $duplicates[$site][$customer->email][$id] = $customer;
                 } elseif ('phone' === $by) {
                     foreach ($customer->phones as $phone) {
-                        if ($clearedPhone = $this->clearPhone($phone)) {
+                        $clearedPhone = $this->clearPhone($phone);
+
+                        if ($this->input->getOption('exclude') && $clearedPhone === $this->input->getOption('exclude')) {
+                            continue;
+                        }
+
+                        if ($clearedPhone) {
                             $duplicates[$site][$clearedPhone][$id] = $customer;
                         }
                     }
@@ -907,5 +933,20 @@ class CheckCommand extends Command
                 $this->input->setOption($key, $option);
             }
         }
+    }
+
+    /**
+     * @param MGCustomer[] $customers
+     * @return bool
+     */
+    protected function hasActiveChannel(array $customers): bool
+    {
+        foreach ($customers as $customer) {
+            if ($customer->mgChannel->active) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

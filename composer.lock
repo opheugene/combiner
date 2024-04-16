@@ -1739,16 +1739,16 @@
         },
         {
             "name": "retailcrm/api-client-php",
-            "version": "v6.8.1",
+            "version": "v6.9.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/retailcrm/api-client-php.git",
-                "reference": "a5ed9af8621523e155475dac8bb7519aac510543"
+                "reference": "f75a653a7d9c995caea49b7e06c4486bb22901a3"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/retailcrm/api-client-php/zipball/a5ed9af8621523e155475dac8bb7519aac510543",
-                "reference": "a5ed9af8621523e155475dac8bb7519aac510543",
+                "url": "https://api.github.com/repos/retailcrm/api-client-php/zipball/f75a653a7d9c995caea49b7e06c4486bb22901a3",
+                "reference": "f75a653a7d9c995caea49b7e06c4486bb22901a3",
                 "shasum": ""
             },
             "require": {
@@ -1838,9 +1838,9 @@
             "support": {
                 "email": "support@retailcrm.pro",
                 "issues": "https://github.com/retailcrm/api-client-php/issues",
-                "source": "https://github.com/retailcrm/api-client-php/tree/v6.8.1"
+                "source": "https://github.com/retailcrm/api-client-php/tree/v6.9.2"
             },
-            "time": "2022-04-06T11:25:28+00:00"
+            "time": "2022-11-18T09:17:42+00:00"
         },
         {
             "name": "symfony/cache",
