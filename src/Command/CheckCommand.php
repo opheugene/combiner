@@ -113,6 +113,12 @@ class CheckCommand extends Command
                         }
                         break;
 
+                    case 'totalSumm':
+                        if ($one->totalSumm != $two->totalSumm) {
+                            return $two->totalSumm <=> $one->totalSumm;
+                        }
+                        break;
+
                     case 'customFieldsCount':
                         $oneCount = count((array) ($one->customFields));
                         $twoCount = count((array) ($two->customFields));
