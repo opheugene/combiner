@@ -101,6 +101,48 @@ class CheckCommand extends Command
         uasort($list, function($one, $two) {
 
             foreach ($this->criteria as $criteria) {
+                if (str_contains($criteria, '.')) { // todo mb allow more recursive depth
+                    [$prefix, $code] = explode('.', $criteria, 2);
+
+                    $oneField = $twoField = null;
+
+                    if (property_exists($one, $prefix)) {
+                        if (is_array($one->$prefix)) {
+                            if (array_key_exists($code, $one->$prefix)) {
+                                $oneField = $one->$prefix->$code;
+                            }
+                        } elseif (is_object($one->$prefix)) {
+                            if (property_exists($one->$prefix, $code)) {
+                                $oneField = $one->$prefix->$code;
+                            }
+                        }
+                    }
+
+                    if (property_exists($two, $prefix)) {
+                        if (is_array($two->$prefix)) {
+                            if (array_key_exists($code, $two->$prefix)) {
+                                $twoField = $two->$prefix->$code;
+                            }
+                        } elseif (is_object($two->$prefix)) {
+                            if (property_exists($two->$prefix, $code)) {
+                                $twoField = $two->$prefix->$code;
+                            }
+                        }
+                    }
+
+                    if (empty($oneField) != empty($twoField)) {
+                        return empty($oneField) <=> empty($twoField);
+                    }
+                }
+
+                if (str_starts_with($criteria, 'site-')) {
+                    $criteriaSite = substr($criteria, 5);
+                    $oneSite = $one->site === $criteriaSite;
+                    $twoSite = $two->site === $criteriaSite;
+
+                    return empty($oneSite) <=> empty($twoSite);
+                }
+
                 switch ($criteria) {
 
                     case 'externalId':
@@ -189,48 +231,6 @@ class CheckCommand extends Command
                             return empty($one->$criteria) <=> empty($two->$criteria);
                         }
                         break;    
-                }
-
-                if (str_contains($criteria, '.')) { // todo mb allow more recursive depth
-                    [$prefix, $code] = explode('.', $criteria, 2);
-
-                    $oneField = $twoField = null;
-
-                    if (property_exists($one, $prefix)) {
-                        if (is_array($one->$prefix)) {
-                            if (array_key_exists($code, $one->$prefix)) {
-                                $oneField = $one->$prefix->$code;
-                            }
-                        } elseif (is_object($one->$prefix)) {
-                            if (property_exists($one->$prefix, $code)) {
-                                $oneField = $one->$prefix->$code;
-                            }
-                        }
-                    }
-
-                    if (property_exists($two, $prefix)) {
-                        if (is_array($two->$prefix)) {
-                            if (array_key_exists($code, $two->$prefix)) {
-                                $twoField = $two->$prefix->$code;
-                            }
-                        } elseif (is_object($two->$prefix)) {
-                            if (property_exists($two->$prefix, $code)) {
-                                $twoField = $two->$prefix->$code;
-                            }
-                        }
-                    }
-
-                    if (empty($oneField) != empty($twoField)) {
-                        return empty($oneField) <=> empty($twoField);
-                    }
-                }
-
-                if (str_starts_with($criteria, 'site-')) {
-                    $criteriaSite = substr($criteria, 5);
-                    $oneSite = $one->site === $criteriaSite;
-                    $twoSite = $two->site === $criteriaSite;
-
-                    return empty($oneSite) <=> empty($twoSite);
                 }
             }
 

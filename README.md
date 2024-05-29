@@ -9,12 +9,17 @@ bin/console duplicates:by email|phone criteria1 criteria2 criteria3 ...  --field
 
 * **externalId**: the externalId value exists
 * **ordersCount**: which customer has more orders
+* **totalSumm**: which customer has more totalSumm
+* **customFieldsCount**: which customer has more completed customFields
 * **email**: the email value exists
 * **phone**: at least one phone number exists
 * **phoneExactLength**: the length of one of the client's phones is greater than or equal to a certain number of digits (use `--phoneExactLength` option to specify a number of digits)
 * **sourcePriority**: client source priority (use `--sourcePriority` option to specify priority of sources: `--sourcePriority=Excel=10,PrestaShop=8,Messanger=4`)
 * **createdAt**: an older client is more important
 * **moreData**: client with more fulfilled card is more important ('firstName', 'lastName', 'email', 'phones', 'birthday', 'address')
+* **hasChat**: the mgCustomers array exists. If all duplicates have mgCustomers array, customer with active channel is more important
+* By default: which customer have that field
+* CustomFields can be passed in format: ```customFields.field```: which customer have that field 
 
 **Connection settings:**
 
@@ -50,6 +55,16 @@ To merge managers add `--merge-managers`
 bin/console duplicates:by phone externalId ordersCount email phone createdAt --csv --merge-managers
 ```
 
+To merge numbers to number with country code add `--merge-phones`
+```
+bin/console duplicates:by phone externalId ordersCount email phone createdAt --csv --merge-phones
+```
+
+To collect all emails in resulting customer custom field add `--collectEmails`
+```
+bin/console duplicates:by phone externalId ordersCount email phone createdAt --csv --collectEmails
+```
+
 To merge other customer fields add `--mergeFields`
 ```
 bin/console duplicates:by email externalId ordersCount email createdAt --csv --mergeFields=customField.cedula,birthday
@@ -77,6 +92,50 @@ options:
     all-sites: true
     no-cache: true
     csv: true
+```
+
+**Config file:**
+
+Full config file:
+```
+arguments:
+    criteria:
+        - externalId
+        - ordersCount
+        - totalSumm
+        - customFieldsCount
+        - email
+        - phone
+        - phoneExactLength
+        - sourcePriority
+        - createdAt
+        - moreData
+        - hasChat
+
+options:
+    crmUrl: 'crmUrl'
+    apiKey: 'apiKey'
+    fields: 'id,email,site,all needed in table fields'
+    consider-orders:
+        orderType:
+            - 'mostImportantType'
+            - 'type'
+            - 'lessImportantType'
+        createdAt: true
+    merge-phones: '10'
+    collectEmails: 'secondary_email'
+    mergeFields: 'birthday'
+    
+    phoneExactLength: '11'
+    sourcePriority: 'Excel=10,PrestaShop=8,Messanger=4'
+    exclude: 'unwanted to combine email or phone'
+
+    merge-managers: true
+
+    all-sites: true
+    no-cache: true
+    csv: true
+    combine: false
 ```
 
 To periodically execute the command on CRON:
