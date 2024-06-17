@@ -77,6 +77,7 @@ class CheckCommand extends Command
             ->addOption('config', '-c', InputOption::VALUE_REQUIRED, 'File with all command options')
             ->addOption('fields', null, InputOption::VALUE_REQUIRED, 'Fields to show in report, comma separated')
             ->addOption('all-sites', null, InputOption::VALUE_NONE, 'Look for duplicates in all sites')
+            ->addOption('filter-sites', null, InputOption::VALUE_REQUIRED, 'Look for duplicates in specific sites')
             ->addOption('no-cache', null, InputOption::VALUE_NONE, 'Get data without cache')
             ->addOption('csv', null, InputOption::VALUE_NONE, 'Save report to CSV file')
             ->addOption('combine', null, InputOption::VALUE_NONE, 'Do combine duplicates of clients')
@@ -398,6 +399,8 @@ class CheckCommand extends Command
         // get customers by sites
         $noCache = $this->input->getOption('no-cache');
         $allSites = $this->input->getOption('all-sites');
+        $filterSitesOption = $this->input->getOption('filter-sites');
+        $filterSites = $filterSitesOption ? explode(',', $filterSitesOption) : [];
         $customersBySites = $this->api->getCachedCustomersBySites($noCache);
 
         // prepare lists of duplicates
@@ -405,6 +408,14 @@ class CheckCommand extends Command
         $duplicatesByNameRef = [];
 
         foreach ($customersBySites as $site => $customers) {
+            if (!empty($filterSites)) {
+                if (!in_array($site, $filterSites)) {
+                    continue;
+                }
+
+                $site = 'filter_sites';
+            }
+
             $site = $allSites ? 'all_sites' : $site;
 
             foreach ($customers as $id => $customer) {

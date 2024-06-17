@@ -70,6 +70,15 @@ To merge other customer fields add `--mergeFields`
 bin/console duplicates:by email externalId ordersCount email createdAt --csv --mergeFields=customField.cedula,birthday
 ```
 
+To combine customers from specific sites add `--filter-sites`. If you need to combine customers without a site, use `_`
+```
+bin/console duplicates:by email ordersCount createdAt --csv --filter-sites='_,site1'
+```
+To combine customers from all sites add just `--all-sites`
+```
+bin/console duplicates:by email ordersCount createdAt --csv --all-sites
+```
+
 To check customer orders parameters add `--consider-orders`. Example for configFile.yaml:
 ```
 arguments:
@@ -132,7 +141,8 @@ options:
 
     merge-managers: true
 
-    all-sites: true
+    all-sites: false
+    filter-sites: '_,site1'
     no-cache: true
     csv: true
     combine: false
