@@ -9,11 +9,13 @@
         "ext-iconv": "*",
         "ext-json": "*",
         "guzzlehttp/guzzle": "^7.0",
-        "retailcrm/api-client-php": "~6.0",
+        "php-http/message-factory": "^1.1",
+        "retailcrm/api-client-php": "6.15.11",
         "symfony/console": "5.4.*",
         "symfony/dotenv": "5.4.*",
         "symfony/flex": "^1.17|^2",
         "symfony/framework-bundle": "5.4.*",
+        "symfony/http-client": "^5.4",
         "symfony/monolog-bundle": "^3.7",
         "symfony/rate-limiter": "5.4.*",
         "symfony/runtime": "5.4.*",
@@ -24,7 +26,8 @@
             "composer/package-versions-deprecated": true,
             "symfony/flex": true,
             "symfony/runtime": true,
-            "civicrm/composer-compile-plugin": true
+            "civicrm/composer-compile-plugin": true,
+            "php-http/discovery": true
         },
         "optimize-autoloader": true,
         "preferred-install": {
