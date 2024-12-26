@@ -237,6 +237,7 @@ class ApiWrapper implements ApiWrapperInterface
     public function customerSubscribe($customer, $subscriptions, $by = ByIdentifier::EXTERNAL_ID): void
     {
         $this->logger->debug('Customer to subscribe: ' . print_r($customer, true));
+        $this->logger->debug('Subscriptions: ' . print_r($subscriptions, true));
 
         $request           = new CustomersSubscriptionsRequest();
         $request->by       = $by;
