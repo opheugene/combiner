@@ -2,9 +2,6 @@
     "civicrm/composer-compile-plugin": {
         "version": "v0.18"
     },
-    "clue/stream-filter": {
-        "version": "v1.6.0"
-    },
     "doctrine/annotations": {
         "version": "1.13",
         "recipe": {
@@ -16,6 +13,9 @@
         "files": [
             "config/routes/annotations.yaml"
         ]
+    },
+    "doctrine/deprecations": {
+        "version": "1.1.4"
     },
     "doctrine/inflector": {
         "version": "2.0.4"
@@ -53,20 +53,14 @@
     "nikic/php-parser": {
         "version": "v4.13.2"
     },
-    "php-http/curl-client": {
-        "version": "2.2.1"
-    },
     "php-http/discovery": {
         "version": "1.14.1"
     },
     "php-http/httplug": {
         "version": "2.3.0"
     },
-    "php-http/message": {
-        "version": "1.13.0"
-    },
     "php-http/message-factory": {
-        "version": "v1.0.2"
+        "version": "1.1.0"
     },
     "php-http/promise": {
         "version": "1.1.0"
@@ -176,6 +170,12 @@
             "src/Controller/.gitignore",
             "src/Kernel.php"
         ]
+    },
+    "symfony/http-client": {
+        "version": "v5.4.49"
+    },
+    "symfony/http-client-contracts": {
+        "version": "v2.5.5"
     },
     "symfony/http-foundation": {
         "version": "v5.4.6"

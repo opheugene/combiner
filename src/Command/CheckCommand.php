@@ -8,6 +8,7 @@ use Psr\Log\LoggerInterface;
 use RetailCrm\Api\Enum\ByIdentifier;
 use RetailCrm\Api\Model\Entity\Customers\Customer;
 use RetailCrm\Api\Model\Entity\Customers\MGCustomer;
+use RetailCrm\Api\Model\Entity\Customers\Subscription;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\TableSeparator;
 use Symfony\Component\Console\Input\InputArgument;
@@ -83,6 +84,7 @@ class CheckCommand extends Command
             ->addOption('combine', null, InputOption::VALUE_NONE, 'Do combine duplicates of clients')
             ->addOption('merge-managers', null, InputOption::VALUE_NONE, 'Merge duplicates managers to client')
             ->addOption('merge-phones', null, InputOption::VALUE_REQUIRED, 'Merge numbers to number with country code')
+            ->addOption('merge-subscriptions', null, InputOption::VALUE_NONE, 'Merge customer subscriptions status')
             ->addOption('collectEmails', null, InputOption::VALUE_REQUIRED, 'Collect all emails in resulting customer custom field')
             ->addOption('mergeFields', null, InputOption::VALUE_REQUIRED, 'Other fields, that needs to be merged')
             ->addOption('consider-orders', null, InputOption::VALUE_NONE, 'Consider order parameters')
@@ -654,6 +656,39 @@ class CheckCommand extends Command
             unset($customers);
         }
 
+        // merge subscriptions
+        $subscribeCustomer = [];
+        if ($this->input->getOption('merge-subscriptions')) {
+            foreach ($duplicates as $customers) {
+                foreach ($customers as $list) {
+                    $subscriptions = [];
+                    foreach (reset($list)->customerSubscriptions as $customerSubscription) {
+                        $serializedSubscription = new Subscription();
+                        $serializedSubscription->channel = $customerSubscription->subscription->channel;
+                        $serializedSubscription->active = $customerSubscription->subscribed;
+
+                        $subscriptions[$serializedSubscription->channel] = $serializedSubscription;
+                    }
+
+                    foreach ($list as $item) {
+                        foreach ($item->customerSubscriptions as $customerSubscription) {
+                            $channel = $customerSubscription->subscription->channel;
+                            $subscriptions[$channel]->active = $subscriptions[$channel]->active && $customerSubscription->subscribed;
+                        }
+                    }
+
+                    $customerId = reset($list)->id;
+                    if (!isset($subscribeCustomer[$customerId])) {
+                        $customer = new Customer();
+                        $customer->id = $customerId;
+                        $customer->site = reset($list)->site;
+                        $subscribeCustomer[$customerId]['customer'] = $customer;
+                    }
+                    $subscribeCustomer[$customerId]['subscriptions'] = $subscriptions;
+                }
+            }
+        }
+
         // other fields to merge
         if ($this->input->getOption('mergeFields')) {
             $mergeFields = $this->input->getOption('mergeFields') ? explode(',', $this->input->getOption('mergeFields')) : [];
@@ -790,6 +825,13 @@ class CheckCommand extends Command
                         $resultCustomerId = key($list);
                         if (isset($editCustomer[$resultCustomerId])) {
                             $this->api->customerEdit($editCustomer[$resultCustomerId], ByIdentifier::ID);
+                        }
+                        if (isset($subscribeCustomer[$resultCustomerId])) {
+                            $this->api->customerSubscribe(
+                                $subscribeCustomer[$resultCustomerId]['customer'],
+                                $subscribeCustomer[$resultCustomerId]['subscriptions'],
+                                ByIdentifier::ID
+                            );
                         }
                     }
                 }

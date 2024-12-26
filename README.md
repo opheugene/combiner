@@ -60,6 +60,11 @@ To merge numbers to number with country code add `--merge-phones`
 bin/console duplicates:by phone externalId ordersCount email phone createdAt --csv --merge-phones
 ```
 
+To unsubscribe customer if duplicate unsubscribed for every subscription add `--merge-subscriptions`
+```
+bin/console duplicates:by phone externalId ordersCount email phone createdAt --csv --merge-subscriptions
+```
+
 To collect all emails in resulting customer custom field add `--collectEmails`
 ```
 bin/console duplicates:by phone externalId ordersCount email phone createdAt --csv --collectEmails

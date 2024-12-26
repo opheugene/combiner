@@ -10,6 +10,7 @@ use RetailCrm\Api\Model\Entity\Customers\SerializedCustomerReference;
 use RetailCrm\Api\Model\Request\Customers\CustomersCombineRequest;
 use RetailCrm\Api\Model\Request\Customers\CustomersEditRequest;
 use RetailCrm\Api\Model\Request\Customers\CustomersRequest;
+use RetailCrm\Api\Model\Request\Customers\CustomersSubscriptionsRequest;
 use RetailCrm\Api\Model\Request\Orders\OrdersRequest;
 
 class ApiWrapper implements ApiWrapperInterface
@@ -231,5 +232,37 @@ class ApiWrapper implements ApiWrapperInterface
         }
 
         return $orders;
+    }
+
+    public function customerSubscribe($customer, $subscriptions, $by = ByIdentifier::EXTERNAL_ID): void
+    {
+        $this->logger->debug('Customer to subscribe: ' . print_r($customer, true));
+
+        $request           = new CustomersSubscriptionsRequest();
+        $request->by       = $by;
+        $request->site     = $customer->site;
+        $request->subscriptions = $subscriptions;
+
+        try {
+            if ($by === ByIdentifier::EXTERNAL_ID) {
+                $this->client->customers->subscriptions($customer->externalId, $request);
+            } else {
+                $this->client->customers->subscriptions($customer->id, $request);
+            }
+        } catch (\Exception $exception) {
+            $this->logger->error(sprintf(
+                'Error from RetailCRM API (status code: %d): %s',
+                $exception->getStatusCode(),
+                $exception->getMessage()
+            ));
+
+            return;
+        }
+
+        if ($by === ByIdentifier::EXTERNAL_ID) {
+            $this->logger->info('Customer subscribed: externalId#' . $customer->externalId);
+        } else {
+            $this->logger->info('Customer subscribed: id#' . $customer->id);
+        }
     }
 }
